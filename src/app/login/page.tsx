@@ -143,15 +143,15 @@ export default function LoginPage() {
               <input
                 type="password"
                 required
-                minLength={8}
-                placeholder="••••••••"
+                minLength={12}
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
             {mode === "register" && (
-              <p className="text-[10px] text-content-muted mt-1">Must be at least 8 characters</p>
+              <p className="text-[10px] text-content-muted mt-1">Must be at least 12 characters</p>
             )}
           </div>
 
@@ -173,7 +173,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-xs text-content-muted">
           <span>Standard dev credentials: </span>
-          <span className="font-mono text-[11px] text-content-primary">admin@example.com / Admin1234!</span>
+          <span className="font-mono text-[11px] text-content-primary">demo@example.test / ChangeMe-Only-For-Local-Development!</span>
         </div>
       </div>
     </div>

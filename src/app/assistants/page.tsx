@@ -25,9 +25,10 @@ import { ErrorState } from "@/components/ui/ErrorState";
 
 const USE_CASE_OPTIONS = [
   { value: "appointment_booking", label: "Appointment Booking", desc: "Schedule appointments, dental checkups, calendar slots" },
-  { value: "customer_support", label: "Customer Support", desc: "Answer queries, triage tickets, lookup FAQs" },
-  { value: "sales", label: "Sales & Inquiries", desc: "Qualify inbound prospects, capture CRM leads" },
-  { value: "general", label: "General Assistant", desc: "Multi-purpose business representative" },
+  { value: "inbound_query_handling", label: "Inbound Query Handling", desc: "Answer inquiries, support triage, knowledge base FAQ lookup" },
+  { value: "selling", label: "Selling & Conversion", desc: "Product recommendations, prospect qualification, closing sales" },
+  { value: "outreach", label: "Proactive Outreach", desc: "Lead re-engagement, status notifications, automated follow-ups" },
+  { value: "cold_outreach", label: "Cold Outreach", desc: "High-conversion outbound prospecting and lead qualification" },
 ];
 
 const AVAILABLE_ACTIONS = [

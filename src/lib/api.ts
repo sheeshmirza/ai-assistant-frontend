@@ -9,7 +9,9 @@ export interface APIError {
 export interface User {
   id: string;
   email: string;
-  fullName: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -30,7 +32,13 @@ export interface Assistant {
   id: string;
   organizationId: string;
   name: string;
-  useCase: "customer_support" | "sales" | "appointment_booking" | "general" | string;
+  useCase:
+    | "appointment_booking"
+    | "inbound_query_handling"
+    | "selling"
+    | "outreach"
+    | "cold_outreach"
+    | string;
   channels: string[];
   status: "active" | "draft" | "archived" | "deleted" | string;
   systemPrompt?: string;
@@ -60,14 +68,40 @@ export interface ActionTaken {
   result?: Record<string, unknown>;
 }
 
+export interface ConversationMessage {
+  role: "user" | "assistant" | "tool" | "system";
+  content: string;
+  timestamp: string;
+}
+
+export interface ConversationLog {
+  id: string;
+  organizationId: string;
+  assistantId: string;
+  conversationId: string;
+  channel: string;
+  messages: ConversationMessage[];
+  metadata?: {
+    actions_taken?: ActionTaken[];
+    [key: string]: any;
+  };
+  createdAt: string;
+}
+
 export interface TranscriptEntry {
   id: string;
   organizationId: string;
   assistantId: string;
   conversationId: string;
-  role: "user" | "assistant" | "system";
-  content: string;
+  channel?: string;
+  messages?: ConversationMessage[];
+  role?: "user" | "assistant" | "system";
+  content?: string;
   actionsTaken?: ActionTaken[];
+  metadata?: {
+    actions_taken?: ActionTaken[];
+    [key: string]: any;
+  };
   createdAt: string;
 }
 
@@ -75,6 +109,7 @@ export interface ChatResponseData {
   reply: string;
   conversationId: string;
   actionsTaken?: ActionTaken[];
+  actions_taken?: ActionTaken[];
 }
 
 export interface OutboundMessageResponseData {
@@ -202,9 +237,12 @@ class APIClient {
 
   // Auth Endpoints
   async register(email: string, password: string, fullName: string) {
+    const parts = fullName.trim().split(/\s+/);
+    const firstName = parts[0] || "User";
+    const lastName = parts.slice(1).join(" ") || "Account";
     return this.request<{ token: string; user: User }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, fullName }),
+      body: JSON.stringify({ email, password, firstName, lastName }),
     });
   }
 
@@ -286,23 +324,37 @@ class APIClient {
   }
 
   // Conversations & Communications
-  async sendChat(orgId: string, data: { assistantId: string; conversationId: string; message: string }) {
+  async sendChat(
+    orgId: string,
+    data: { assistantId: string; conversationId?: string; message: string }
+  ) {
+    const payload: { assistantId: string; message: string; conversationId?: string } = {
+      assistantId: data.assistantId,
+      message: data.message,
+    };
+    if (data.conversationId && data.conversationId.trim()) {
+      payload.conversationId = data.conversationId.trim();
+    }
     return this.request<ChatResponseData>(`/api/organizations/${orgId}/chat`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
   }
 
   async initiateCall(
     orgId: string,
     asstId: string,
-    data: { to: string; openingMessage?: string }
+    data: { to?: string; toPhoneNumber?: string; openingMessage?: string }
   ) {
+    const payload = {
+      toPhoneNumber: data.toPhoneNumber || data.to || "",
+      openingMessage: data.openingMessage || "",
+    };
     return this.request<OutboundCallResponseData>(
       `/api/organizations/${orgId}/assistants/${asstId}/calls`,
       {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       }
     );
   }
