@@ -1721,16 +1721,44 @@ export default function VoicePlaygroundPage() {
                   <span>Acoustic & Voice Settings</span>
                 </div>
 
-                {/* Hands-Free Toggle */}
-                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-content-primary">
-                  <input
-                    type="checkbox"
-                    checked={isHandsFree}
-                    onChange={(e) => setIsHandsFree(e.target.checked)}
-                    className="rounded text-indigo-600 focus:ring-0"
-                  />
-                  <span>Hands-Free Dialogue</span>
-                </label>
+                <div className="flex items-center gap-3">
+                  {/* One-click Audio / Speaker Test */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                        window.speechSynthesis.resume();
+                      }
+                      speakAssistantReply(
+                        selectedLang.code.startsWith("es")
+                          ? "Prueba de audio. La salida de voz funciona correctamente."
+                          : selectedLang.code.startsWith("fr")
+                          ? "Test audio. La sortie vocale fonctionne correctement."
+                          : selectedLang.code.startsWith("hi")
+                          ? "ऑडियो टेस्ट। वॉयस आउटपुट चालू है।"
+                          : selectedLang.code.startsWith("de")
+                          ? "Audio-Test. Die Sprachausgabe funktioniert einwandfrei."
+                          : "Audio check. Voice output is functioning properly."
+                      );
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 transition-all flex items-center gap-1 active:scale-95"
+                    title="Click to test your device speaker"
+                  >
+                    <Volume2 className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                    <span>Test Audio</span>
+                  </button>
+
+                  {/* Hands-Free Toggle */}
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-content-primary">
+                    <input
+                      type="checkbox"
+                      checked={isHandsFree}
+                      onChange={(e) => setIsHandsFree(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-0"
+                    />
+                    <span>Hands-Free</span>
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
