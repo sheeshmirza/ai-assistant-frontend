@@ -31,6 +31,10 @@ import {
   ShieldCheck,
   Play,
   Volume1,
+  Sliders,
+  Settings,
+  Wifi,
+  Zap,
 } from "lucide-react";
 import CodeSnippet from "@/components/ui/CodeSnippet";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -59,6 +63,7 @@ const DTMF_FREQS: Record<string, [number, number]> = {
   "#": [941, 1477],
 };
 
+// Play realistic DTMF touch tones
 function playDtmfTone(char: string) {
   if (typeof window === "undefined") return;
   const AudioContextClass =
@@ -74,7 +79,9 @@ function playDtmfTone(char: string) {
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    gain.gain.value = 0.12;
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+
     osc1.frequency.value = freqs[0];
     osc2.frequency.value = freqs[1];
 
@@ -86,13 +93,114 @@ function playDtmfTone(char: string) {
     osc2.start();
 
     setTimeout(() => {
-      osc1.stop();
-      osc2.stop();
-      ctx.close();
-    }, 150);
+      try {
+        osc1.stop();
+        osc2.stop();
+        ctx.close();
+      } catch {}
+    }, 180);
+  } catch {}
+}
+
+// Play realistic ringback tone (440Hz + 480Hz modulated cadence)
+function startRingbackTone(): () => void {
+  if (typeof window === "undefined") return () => {};
+  const AudioContextClass =
+    window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return () => {};
+
+  try {
+    const ctx = new AudioContextClass();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.frequency.value = 440;
+    osc2.frequency.value = 480;
+    gain.gain.value = 0.05;
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start();
+    osc2.start();
+
+    let ringOn = true;
+    const interval = setInterval(() => {
+      ringOn = !ringOn;
+      gain.gain.setValueAtTime(ringOn ? 0.05 : 0.0001, ctx.currentTime);
+    }, 1500);
+
+    return () => {
+      clearInterval(interval);
+      try {
+        osc1.stop();
+        osc2.stop();
+        ctx.close();
+      } catch {}
+    };
   } catch {
-    // AudioContext blocked or unsupported in current environment
+    return () => {};
   }
+}
+
+// Play connection pickup click
+function playPickupTone() {
+  if (typeof window === "undefined") return;
+  const AudioContextClass =
+    window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  try {
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.06);
+
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(() => {
+      try {
+        osc.stop();
+        ctx.close();
+      } catch {}
+    }, 100);
+  } catch {}
+}
+
+// Play disconnect tone
+function playHangupTone() {
+  if (typeof window === "undefined") return;
+  const AudioContextClass =
+    window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  try {
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.frequency.setValueAtTime(480, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(() => {
+      try {
+        osc.stop();
+        ctx.close();
+      } catch {}
+    }, 220);
+  } catch {}
 }
 
 export default function VoicePlaygroundPage() {
@@ -117,11 +225,17 @@ export default function VoicePlaygroundPage() {
   const [callDuration, setCallDuration] = useState<number>(0);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
+  const [isHandsFree, setIsHandsFree] = useState(true);
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfBuffer, setDtmfBuffer] = useState<string>("");
   const [textUtterance, setTextUtterance] = useState("");
-  const [isSpeechRecognitionActive, setIsSpeechRecognitionActive] = useState(false);
   const [transferDetected, setTransferDetected] = useState<string | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+
+  // Voice Persona Settings
+  const [selectedVoiceRate, setSelectedVoiceRate] = useState<number>(1.05);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("auto");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Outbound Dispatcher State
   const [toPhoneNumber, setToPhoneNumber] = useState("");
@@ -135,7 +249,15 @@ export default function VoicePlaygroundPage() {
   // Audio / Speech Recognition Refs
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const ringbackStopperRef = useRef<(() => void) | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  // Canvas Visualizer Refs
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
 
   // Scroll transcript to bottom
   const scrollToBottom = () => {
@@ -145,6 +267,20 @@ export default function VoicePlaygroundPage() {
   useEffect(() => {
     scrollToBottom();
   }, [callTurns]);
+
+  // Load available speech synthesis voices
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoices = voices.filter((v) => v.lang.startsWith("en"));
+      setAvailableVoices(englishVoices.length > 0 ? englishVoices : voices);
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   // Load assistants on mount
   useEffect(() => {
@@ -195,25 +331,179 @@ export default function VoicePlaygroundPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Canvas Frequency Visualizer Loop (60 FPS Web Audio)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let running = true;
+    let phase = 0;
+
+    const render = () => {
+      if (!running) return;
+
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      // Read real microphone frequencies if active
+      let freqData: Uint8Array | null = null;
+      if (analyserRef.current && !isMicMuted && (callState === "listening" || callState === "connected")) {
+        freqData = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(freqData);
+      }
+
+      const centerY = height / 2;
+      const isCallActive = ["connected", "listening", "thinking", "speaking"].includes(callState);
+
+      if (!isCallActive) {
+        // Resting flatline
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(156, 163, 175, 0.3)";
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+      } else if (callState === "speaking") {
+        // Organic assistant speaking waves
+        phase += 0.08;
+        ctx.lineWidth = 2.5;
+
+        // Wave 1: Primary emerald wave
+        ctx.beginPath();
+        ctx.strokeStyle = "#10b981";
+        for (let x = 0; x < width; x += 4) {
+          const y =
+            centerY +
+            Math.sin(x * 0.03 + phase) * 16 * Math.sin((x / width) * Math.PI) +
+            Math.cos(x * 0.06 - phase * 0.7) * 8 * Math.sin((x / width) * Math.PI);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Wave 2: Complementary glow wave
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
+        for (let x = 0; x < width; x += 4) {
+          const y =
+            centerY +
+            Math.sin(x * 0.04 - phase * 1.2) * 12 * Math.sin((x / width) * Math.PI);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      } else if (callState === "thinking") {
+        // Pulsing amber wave
+        phase += 0.12;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.strokeStyle = "#f59e0b";
+        for (let x = 0; x < width; x += 4) {
+          const y =
+            centerY +
+            Math.sin(x * 0.08 + phase) * 8 * Math.sin((x / width) * Math.PI);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      } else if (freqData && freqData.length > 0) {
+        // Real-time microphone reactive waveform
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.strokeStyle = "#6366f1";
+
+        const sliceWidth = width / 48;
+        let x = 0;
+        for (let i = 0; i < 48; i++) {
+          const v = freqData[i * 2] / 255.0;
+          const amp = v * (height * 0.42);
+          const y = i % 2 === 0 ? centerY - amp : centerY + amp;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          x += sliceWidth;
+        }
+        ctx.stroke();
+      } else {
+        // Subtle ambient listening pulse
+        phase += 0.04;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(99, 102, 241, 0.5)";
+        for (let x = 0; x < width; x += 4) {
+          const y =
+            centerY +
+            Math.sin(x * 0.02 + phase) * 5 * Math.sin((x / width) * Math.PI);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      animationFrameRef.current = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      running = false;
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [callState, isMicMuted]);
+
+  // Clean Web Audio MediaStream on hangup / unmount
+  const stopMicrophoneStream = useCallback(() => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+  }, []);
+
   // Web Speech Synthesis (Assistant speaking aloud)
   const speakAssistantReply = useCallback(
-    (text: string) => {
+    (text: string, onDone?: () => void) => {
       if (!isSpeakerEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) {
         setCallState("connected");
+        if (onDone) onDone();
         return;
       }
 
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
+      utterance.rate = selectedVoiceRate;
       utterance.pitch = 1.0;
 
-      // Select pleasant voice if available
+      // Select voice
       const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(
-        (v) => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha"))
-      ) || voices.find((v) => v.lang.startsWith("en"));
-      if (englishVoice) utterance.voice = englishVoice;
+      let chosenVoice: SpeechSynthesisVoice | undefined;
+
+      if (selectedVoiceName !== "auto") {
+        chosenVoice = voices.find((v) => v.name === selectedVoiceName);
+      }
+
+      if (!chosenVoice) {
+        chosenVoice =
+          voices.find(
+            (v) =>
+              v.lang.startsWith("en") &&
+              (v.name.includes("Natural") ||
+                v.name.includes("Google") ||
+                v.name.includes("Samantha") ||
+                v.name.includes("Daniel") ||
+                v.name.includes("Jenny"))
+          ) || voices.find((v) => v.lang.startsWith("en"));
+      }
+
+      if (chosenVoice) utterance.voice = chosenVoice;
 
       utterance.onstart = () => {
         setCallState("speaking");
@@ -221,15 +511,17 @@ export default function VoicePlaygroundPage() {
 
       utterance.onend = () => {
         setCallState("connected");
+        if (onDone) onDone();
       };
 
       utterance.onerror = () => {
         setCallState("connected");
+        if (onDone) onDone();
       };
 
       window.speechSynthesis.speak(utterance);
     },
-    [isSpeakerEnabled]
+    [isSpeakerEnabled, selectedVoiceName, selectedVoiceRate]
   );
 
   // Send a voice turn to the backend
@@ -248,6 +540,7 @@ export default function VoicePlaygroundPage() {
       setCallTurns((prev) => [...prev, userTurn]);
       setCallState("thinking");
 
+      const t0 = performance.now();
       try {
         const res = await api.sendChat(currentOrg.id, {
           assistantId: selectedAssistantId,
@@ -255,6 +548,9 @@ export default function VoicePlaygroundPage() {
           message: userText,
           channel: "voice",
         });
+
+        const roundtrip = Math.round(performance.now() - t0);
+        setLatencyMs(roundtrip);
 
         if (res.conversationId && (!conversationId || conversationId !== res.conversationId)) {
           setConversationId(res.conversationId);
@@ -271,7 +567,7 @@ export default function VoicePlaygroundPage() {
 
         setCallTurns((prev) => [...prev, assistantTurn]);
 
-        // Check if call transfer tool was invoked
+        // Check for transfer_call action
         const transfer = actions.find((a: ActionTaken) => a.name === "transfer_call");
         if (transfer) {
           const target = (transfer.arguments as any)?.target_phone_number || "human department";
@@ -279,71 +575,113 @@ export default function VoicePlaygroundPage() {
           toastSuccess(`Call transferred to ${target}`);
         }
 
-        speakAssistantReply(res.reply);
+        // Speak reply, then resume listening if hands-free
+        speakAssistantReply(res.reply, () => {
+          if (isHandsFree && !isMicMuted && callState !== "ended") {
+            startSpeechRecognition();
+          }
+        });
       } catch (err: any) {
         toastError(err?.message || "Voice connection encountered an error");
         setCallState("connected");
       }
     },
-    [currentOrg, selectedAssistantId, conversationId, speakAssistantReply, toastSuccess, toastError]
+    [
+      currentOrg,
+      selectedAssistantId,
+      conversationId,
+      speakAssistantReply,
+      isHandsFree,
+      isMicMuted,
+      callState,
+      toastSuccess,
+      toastError,
+    ]
   );
 
-  // Setup Web Speech Recognition
+  // Setup Web Speech Recognition with Hands-Free Continuous Loop
   const startSpeechRecognition = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || isMicMuted) return;
     const SpeechRecognitionClass =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!SpeechRecognitionClass) {
-      toastError("Speech Recognition not supported in this browser. You can type utterances below.");
-      return;
-    }
+    if (!SpeechRecognitionClass) return;
 
     try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+
       const recognition = new SpeechRecognitionClass();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = "en-US";
 
       recognition.onstart = () => {
-        setIsSpeechRecognitionActive(true);
         setCallState("listening");
       };
 
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        if (transcript) {
+        if (transcript && transcript.trim()) {
           sendVoiceTurn(transcript);
         }
       };
 
       recognition.onerror = () => {
-        setIsSpeechRecognitionActive(false);
         setCallState("connected");
       };
 
       recognition.onend = () => {
-        setIsSpeechRecognitionActive(false);
+        // In continuous hands-free mode, if not speaking or thinking, re-arm
+        if (isHandsFree && !isMicMuted && callState === "listening") {
+          try {
+            recognition.start();
+          } catch {}
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch {
-      setIsSpeechRecognitionActive(false);
-    }
-  }, [sendVoiceTurn, toastError]);
+    } catch {}
+  }, [isHandsFree, isMicMuted, callState, sendVoiceTurn]);
 
-  const stopSpeechRecognition = () => {
+  const stopSpeechRecognition = useCallback(() => {
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch {}
-      setIsSpeechRecognitionActive(false);
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  // Initialize Microphone Analyser for realistic Canvas visualizer
+  const startMicrophoneStream = async () => {
+    if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      micStreamRef.current = stream;
+
+      const AudioContextClass =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.8;
+
+      source.connect(analyser);
+      audioContextRef.current = ctx;
+      analyserRef.current = analyser;
+    } catch {
+      // Mic permission blocked or unavailable
     }
   };
 
   // Start Voice Call
-  const handleStartCall = async (greetingMessage?: string) => {
+  const handleStartCall = async (customGreeting?: string) => {
     if (!currentOrg || !selectedAssistantId) return;
 
     setCallState("ringing");
@@ -352,13 +690,24 @@ export default function VoicePlaygroundPage() {
     setConversationId("");
     setTransferDetected(null);
     setDtmfBuffer("");
+    setLatencyMs(null);
 
-    // Simulate phone connection latency (1.2s)
-    setTimeout(async () => {
+    // Start authentic ringback sound
+    const stopRingback = startRingbackTone();
+    ringbackStopperRef.current = stopRingback;
+
+    // Connect microphone for real-time frequency analysis
+    await startMicrophoneStream();
+
+    // Answer call after realistic 1.6s connection delay
+    setTimeout(() => {
+      if (ringbackStopperRef.current) ringbackStopperRef.current();
+      playPickupTone();
       setCallState("connected");
+
       const opening =
-        greetingMessage ||
-        activeAssistant?.systemPrompt?.split(".")[0] ||
+        customGreeting ||
+        activeAssistant?.systemPrompt?.split(".")[0]?.trim() ||
         "Hello! Thank you for calling. How can I help you today?";
 
       const initialTurn: CallTurn = {
@@ -369,19 +718,28 @@ export default function VoicePlaygroundPage() {
       };
 
       setCallTurns([initialTurn]);
-      speakAssistantReply(opening);
-    }, 1200);
+
+      // Speak opening greeting, then automatically arm microphone
+      speakAssistantReply(opening, () => {
+        if (isHandsFree && !isMicMuted) {
+          startSpeechRecognition();
+        }
+      });
+    }, 1600);
   };
 
   // End Voice Call
   const handleEndCall = () => {
+    if (ringbackStopperRef.current) ringbackStopperRef.current();
+    playHangupTone();
+
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
     stopSpeechRecognition();
+    stopMicrophoneStream();
     setCallState("ended");
 
-    // Close conversation session if conversationId exists
     if (currentOrg && selectedAssistantId && conversationId) {
       api.endConversation(currentOrg.id, selectedAssistantId, conversationId).catch(() => {});
     }
@@ -391,12 +749,12 @@ export default function VoicePlaygroundPage() {
   const handleKeypadPress = (digit: string) => {
     playDtmfTone(digit);
     setDtmfBuffer((prev) => prev + digit);
-    if (callState === "connected" || callState === "listening") {
+    if (["connected", "listening", "speaking"].includes(callState)) {
       sendVoiceTurn(`[Keypad Pressed DTMF digit: ${digit}]`);
     }
   };
 
-  // Handle manual text submission into call
+  // Handle manual text submission
   const handleSendUtterance = (e: React.FormEvent) => {
     e.preventDefault();
     if (!textUtterance.trim() || callState === "idle" || callState === "ended") return;
@@ -458,7 +816,7 @@ export default function VoicePlaygroundPage() {
             Voice Playground
           </h1>
           <p className="text-xs text-content-muted mt-1">
-            Simulate real-time phone calls with AI voice agents, test spoken speech synthesis, and manage telephony channels.
+            Real-time telephony phone call simulator, continuous hands-free dialogue, audio visualizer, and Twilio voice routing.
           </p>
         </div>
 
@@ -528,9 +886,9 @@ export default function VoicePlaygroundPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Phone Console & Visualizer (5 Cols) */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="p-6 rounded-2xl border border-surface-border bg-surface shadow-sm relative overflow-hidden space-y-6">
-              {/* Call Status Badge */}
-              <div className="flex items-center justify-between border-b border-surface-border pb-4">
+            <div className="p-6 rounded-2xl border border-surface-border bg-surface shadow-sm relative overflow-hidden space-y-5">
+              {/* Telephony Header & Call State */}
+              <div className="flex items-center justify-between border-b border-surface-border pb-3.5">
                 <div className="flex items-center gap-2">
                   <div
                     className={`h-2.5 w-2.5 rounded-full ${
@@ -549,34 +907,42 @@ export default function VoicePlaygroundPage() {
                   />
                   <span className="text-xs font-bold uppercase tracking-wider text-content-primary">
                     {callState === "idle"
-                      ? "Ready to Connect"
+                      ? "Phone On Hook"
                       : callState === "ringing"
-                      ? "Dialing Assistant..."
+                      ? "Calling Line..."
                       : callState === "speaking"
-                      ? "Assistant Speaking..."
+                      ? "Agent Speaking..."
                       : callState === "listening"
-                      ? "Listening to You..."
+                      ? "Listening to Caller..."
                       : callState === "thinking"
-                      ? "Processing Intent..."
+                      ? "AI Evaluating Intent..."
                       : callState === "ended"
-                      ? "Call Ended"
+                      ? "Call Disconnected"
                       : "Call Connected"}
                   </span>
                 </div>
 
-                {["connected", "listening", "thinking", "speaking"].includes(callState) && (
-                  <div className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                    {formatTimer(callDuration)}
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {latencyMs && ["connected", "listening", "speaking"].includes(callState) && (
+                    <span className="text-[10px] font-mono text-content-muted flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-amber-500" />
+                      {latencyMs}ms
+                    </span>
+                  )}
+                  {["connected", "listening", "thinking", "speaking"].includes(callState) && (
+                    <div className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                      {formatTimer(callDuration)}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Call Transfer Banner */}
+              {/* Call Transfer Alert Banner */}
               {transferDetected && (
                 <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/50 border border-teal-500/30 text-xs flex items-center gap-2 text-teal-800 dark:text-teal-200 animate-slideUp">
                   <PhoneForwarded className="h-4 w-4 text-teal-600 shrink-0" />
                   <div>
-                    <div className="font-bold">Call Transferred via MCP</div>
+                    <div className="font-bold">Call Transferred via TwiML &lt;Dial&gt;</div>
                     <div className="text-[11px] font-mono text-teal-700 dark:text-teal-300">
                       Target: {transferDetected}
                     </div>
@@ -584,13 +950,12 @@ export default function VoicePlaygroundPage() {
                 </div>
               )}
 
-              {/* Central Audio Visualizer Avatar */}
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="relative">
-                  {/* Glowing pulses */}
+              {/* Caller ID Card & Avatar */}
+              <div className="text-center space-y-3 pt-1">
+                <div className="relative inline-block">
                   {["connected", "listening", "thinking", "speaking"].includes(callState) && (
                     <div
-                      className={`absolute -inset-4 rounded-full blur-xl opacity-40 transition-all ${
+                      className={`absolute -inset-3 rounded-full blur-xl opacity-50 transition-all ${
                         callState === "speaking"
                           ? "bg-emerald-500 animate-pulse"
                           : callState === "listening"
@@ -600,9 +965,9 @@ export default function VoicePlaygroundPage() {
                     />
                   )}
 
-                  <div className="relative h-28 w-28 rounded-full border-2 border-surface-border bg-surface-raised flex items-center justify-center shadow-inner">
+                  <div className="relative h-24 w-24 mx-auto rounded-full border-2 border-surface-border bg-surface-raised flex items-center justify-center shadow-inner">
                     <Bot
-                      className={`h-12 w-12 transition-all ${
+                      className={`h-11 w-11 transition-all ${
                         callState === "speaking"
                           ? "text-emerald-600 dark:text-emerald-400 scale-110"
                           : callState === "listening"
@@ -617,105 +982,105 @@ export default function VoicePlaygroundPage() {
                   <h3 className="text-base font-bold text-content-primary">
                     {activeAssistant?.name || "AI Voice Agent"}
                   </h3>
-                  <p className="text-xs text-content-muted capitalize mt-0.5">
-                    {activeAssistant?.useCase.replace(/_/g, " ")} • Telephony Voice
-                  </p>
-                </div>
-
-                {/* Animated Waveform Visualizer */}
-                {["connected", "listening", "thinking", "speaking"].includes(callState) && (
-                  <div className="flex items-center justify-center gap-1.5 h-8">
-                    {[16, 24, 32, 20, 28, 12, 30, 22, 14].map((h, i) => (
-                      <div
-                        key={i}
-                        className={`w-1 rounded-full transition-all duration-300 ${
-                          callState === "speaking"
-                            ? "bg-emerald-500 animate-pulse"
-                            : callState === "listening"
-                            ? "bg-indigo-500 animate-pulse"
-                            : "bg-surface-border"
-                        }`}
-                        style={{
-                          height:
-                            callState === "speaking"
-                              ? `${h}px`
-                              : callState === "listening"
-                              ? `${Math.max(8, h * 0.7)}px`
-                              : "6px",
-                          animationDelay: `${i * 120}ms`,
-                        }}
-                      />
-                    ))}
+                  <div className="flex items-center justify-center gap-2 text-xs text-content-muted mt-0.5 font-mono">
+                    <span>+1 (800) 555-AI24</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                      <Wifi className="h-3 w-3" /> HD Voice
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Main Call Action Buttons */}
+              {/* 60 FPS Real-Time Canvas Audio Frequency Visualizer */}
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={80}
+                  className="w-full h-20 rounded-xl bg-surface-subtle border border-surface-border shadow-inner"
+                />
+                <div className="absolute right-2 top-2 text-[9px] font-mono text-content-muted uppercase tracking-wider">
+                  {callState === "speaking"
+                    ? "Audio Output: Active"
+                    : callState === "listening"
+                    ? "Mic Input: Capturing"
+                    : "Audio: Standby"}
+                </div>
+              </div>
+
+              {/* Call Control Buttons */}
               {callState === "idle" || callState === "ended" ? (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 pt-1">
                   <button
                     onClick={() => handleStartCall()}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg hover:shadow-emerald-500/20 transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg hover:shadow-emerald-500/20 transition-all active:scale-[0.98]"
                   >
                     <PhoneCall className="h-5 w-5" />
-                    <span>Start Voice Call (Simulator)</span>
+                    <span>Call Voice Assistant</span>
                   </button>
 
                   <button
                     onClick={() =>
-                      handleStartCall("Hello, thank you for calling customer service. How may I direct your call?")
+                      handleStartCall("Hello, thank you for calling customer support. How may I direct your call today?")
                     }
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-surface-border bg-surface hover:bg-surface-raised text-xs font-semibold text-content-secondary transition-all"
                   >
                     <PhoneIncoming className="h-4 w-4 text-indigo-600" />
-                    <span>Simulate Inbound Customer Call</span>
+                    <span>Simulate Incoming Caller</span>
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4 pt-2">
-                  {/* Active Call Controls */}
+                <div className="space-y-4 pt-1">
+                  {/* Call Action Bar */}
                   <div className="flex items-center justify-center gap-3">
-                    {/* Mic Toggle */}
+                    {/* Microphone Mute */}
                     <button
                       onClick={() => {
-                        if (isSpeechRecognitionActive) {
+                        setIsMicMuted((prev) => !prev);
+                        if (!isMicMuted) {
                           stopSpeechRecognition();
-                        } else {
+                        } else if (isHandsFree) {
                           startSpeechRecognition();
                         }
                       }}
                       className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
-                        isSpeechRecognitionActive
-                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-4 ring-indigo-500/20"
+                        isMicMuted
+                          ? "bg-rose-500/10 border border-rose-500/20 text-rose-600"
                           : "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
                       }`}
-                      title={isSpeechRecognitionActive ? "Stop Speech Input" : "Speak to Assistant"}
+                      title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
                     >
-                      <Mic className="h-5 w-5" />
+                      {isMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5 text-indigo-600" />}
                     </button>
 
-                    {/* Speaker Output Toggle */}
+                    {/* Speaker Audio Output */}
                     <button
-                      onClick={() => setIsSpeakerEnabled((prev) => !prev)}
+                      onClick={() => {
+                        setIsSpeakerEnabled((prev) => !prev);
+                        if (isSpeakerEnabled && typeof window !== "undefined" && "speechSynthesis" in window) {
+                          window.speechSynthesis.cancel();
+                        }
+                      }}
                       className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
                         isSpeakerEnabled
-                          ? "bg-surface-raised border border-surface-border text-content-primary"
+                          ? "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
                           : "bg-rose-500/10 border border-rose-500/20 text-rose-600"
                       }`}
-                      title={isSpeakerEnabled ? "Mute Assistant Audio" : "Unmute Assistant Audio"}
+                      title={isSpeakerEnabled ? "Mute Speaker" : "Unmute Speaker"}
                     >
                       {isSpeakerEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
                     </button>
 
-                    {/* Keypad Toggle */}
+                    {/* Keypad DTMF Toggle */}
                     <button
                       onClick={() => setShowKeypad((prev) => !prev)}
                       className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
                         showKeypad
-                          ? "bg-indigo-600 text-white shadow-sm"
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                           : "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
                       }`}
-                      title="Toggle Dialpad"
+                      title="Touch-Tone Keypad"
                     >
                       <div className="grid grid-cols-3 gap-0.5">
                         {[...Array(9)].map((_, i) => (
@@ -724,22 +1089,22 @@ export default function VoicePlaygroundPage() {
                       </div>
                     </button>
 
-                    {/* Hang Up Button */}
+                    {/* Red End Call Button */}
                     <button
                       onClick={handleEndCall}
-                      className="h-12 px-6 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg hover:shadow-rose-500/20 transition-all"
+                      className="h-12 px-6 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg hover:shadow-rose-500/20 transition-all active:scale-95"
                       title="Hang Up Call"
                     >
                       <PhoneOff className="h-5 w-5" />
-                      <span>Hang Up</span>
+                      <span>End Call</span>
                     </button>
                   </div>
 
                   {/* Manual Utterance Input (Allows typing simulated speech) */}
-                  <form onSubmit={handleSendUtterance} className="relative flex items-center gap-2 pt-2">
+                  <form onSubmit={handleSendUtterance} className="relative flex items-center gap-2 pt-1">
                     <input
                       type="text"
-                      placeholder="Speak into microphone or type speech utterance..."
+                      placeholder="Speak into microphone or type speech turn..."
                       value={textUtterance}
                       onChange={(e) => setTextUtterance(e.target.value)}
                       className="w-full text-xs pl-3 pr-10 py-2.5 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
@@ -747,8 +1112,8 @@ export default function VoicePlaygroundPage() {
                     <button
                       type="submit"
                       disabled={!textUtterance.trim()}
-                      className="absolute right-1.5 top-3.5 p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white transition-colors"
-                      title="Send Utterance"
+                      className="absolute right-1.5 top-2.5 p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white transition-colors"
+                      title="Send Spoken Utterance"
                     >
                       <Send className="h-3 w-3" />
                     </button>
@@ -756,13 +1121,13 @@ export default function VoicePlaygroundPage() {
                 </div>
               )}
 
-              {/* Synthesized DTMF Dialpad Drawer */}
+              {/* Synthesized DTMF Keypad Drawer */}
               {showKeypad && (
                 <div className="p-4 rounded-xl border border-surface-border bg-surface-raised/40 space-y-3 animate-slideUp">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-content-primary">DTMF Touch-Tone Keypad</span>
                     <span className="font-mono text-[11px] text-content-muted">
-                      {dtmfBuffer ? `Input: ${dtmfBuffer}` : "Press digits"}
+                      {dtmfBuffer ? `Buffer: ${dtmfBuffer}` : "Click to dial"}
                     </span>
                   </div>
 
@@ -782,35 +1147,61 @@ export default function VoicePlaygroundPage() {
               )}
             </div>
 
-            {/* Voice Telephony Specs Card */}
-            <div className="p-5 rounded-2xl border border-surface-border bg-surface shadow-sm space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-content-primary">
-                <Sparkles className="h-4 w-4 text-indigo-600" />
-                <span>Voice Agent Capabilities</span>
+            {/* Voice Settings & Optimization Controls */}
+            <div className="p-5 rounded-2xl border border-surface-border bg-surface shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-content-primary">
+                  <Sliders className="h-4 w-4 text-indigo-600" />
+                  <span>Acoustic & Voice Settings</span>
+                </div>
+
+                {/* Hands-Free Toggle */}
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-content-primary">
+                  <input
+                    type="checkbox"
+                    checked={isHandsFree}
+                    onChange={(e) => setIsHandsFree(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-0"
+                  />
+                  <span>Hands-Free Auto-Dialogue</span>
+                </label>
               </div>
-              <div className="text-xs text-content-secondary space-y-1.5 leading-relaxed">
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="font-semibold text-content-primary">Model: </span>
-                  <span className="font-mono text-[11px]">Gemini 2.5 Flash Lite (ultra-low latency voice)</span>
+                  <label className="block text-[11px] text-content-muted mb-1">Synthesizer Voice</label>
+                  <select
+                    value={selectedVoiceName}
+                    onChange={(e) => setSelectedVoiceName(e.target.value)}
+                    className="w-full text-[11px] px-2 py-1.5 rounded-lg border border-surface-border bg-background text-content-primary focus:outline-none"
+                  >
+                    <option value="auto">Natural Neural (Auto)</option>
+                    {availableVoices.map((v) => (
+                      <option key={v.name} value={v.name}>
+                        {v.name.length > 24 ? v.name.substring(0, 24) + "..." : v.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
                 <div>
-                  <span className="font-semibold text-content-primary">Enabled Channels: </span>
-                  <span className="font-mono text-[11px]">{activeAssistant?.channels.join(", ")}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-content-primary">MCP Actions: </span>
-                  <span className="font-mono text-[11px]">
-                    {activeAssistant?.enabledActions && activeAssistant.enabledActions.length > 0
-                      ? activeAssistant.enabledActions.join(", ")
-                      : "Standard phone dialogue"}
-                  </span>
+                  <label className="block text-[11px] text-content-muted mb-1">Pacing Rate: {selectedVoiceRate}x</label>
+                  <input
+                    type="range"
+                    min={0.9}
+                    max={1.25}
+                    step={0.05}
+                    value={selectedVoiceRate}
+                    onChange={(e) => setSelectedVoiceRate(parseFloat(e.target.value))}
+                    className="w-full accent-indigo-600 mt-2"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Right Column: Live Call Transcript & Audited Actions (7 Cols) */}
-          <div className="lg:col-span-7 space-y-4 flex flex-col h-[680px]">
+          <div className="lg:col-span-7 space-y-4 flex flex-col h-[700px]">
             <div className="p-4 rounded-2xl border border-surface-border bg-surface shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-emerald-600" />
@@ -844,7 +1235,7 @@ export default function VoicePlaygroundPage() {
                   </div>
                   <h4 className="text-sm font-bold text-content-primary">No Active Voice Call</h4>
                   <p className="text-xs text-content-muted max-w-sm leading-relaxed">
-                    Start a simulated phone call using the console on the left. The caller speech turns and assistant verbal replies will stream here in real time.
+                    Click &ldquo;Call Voice Assistant&rdquo; on the left to start a real-time hands-free audio conversation. Spoken speech and audited MCP tool actions will stream here.
                   </p>
                 </div>
               ) : (
@@ -854,7 +1245,7 @@ export default function VoicePlaygroundPage() {
                     className={`flex gap-3 ${turn.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {turn.role === "assistant" && (
-                      <div className="h-7 w-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="h-7 w-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
                         <Bot className="h-4 w-4" />
                       </div>
                     )}
