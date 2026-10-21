@@ -34,19 +34,17 @@ export default function KnowledgeBasePage() {
   // Collections & Assistants
   const [collections, setCollections] = useState<string[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
-  const [collectionName, setCollectionName] = useState("company-faq");
+  const [collectionName, setCollectionName] = useState("");
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
 
   // Ingestion State
-  const [documentTitle, setDocumentTitle] = useState("Cancellation Policy");
-  const [documentContent, setDocumentContent] = useState(
-    "Appointments can be rescheduled or cancelled with at least 24 hours notice without penalty. Late cancellations incur a $25 fee."
-  );
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [documentContent, setDocumentContent] = useState("");
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestedChunks, setIngestedChunks] = useState<IngestedChunkRecord[]>([]);
 
   // Search State
-  const [searchQuery, setSearchQuery] = useState("What happens if I cancel late?");
+  const [searchQuery, setSearchQuery] = useState("");
   const [topK, setTopK] = useState(3);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<VectorSearchResult[]>([]);
