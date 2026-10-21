@@ -59,7 +59,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "English (US)",
     flag: "🇺🇸",
     prefix: "en",
-    defaultGreeting: "Thank you for calling Acme Global. How may I assist you today?",
+    defaultGreeting: "Thank you for calling. How may I assist you today?",
   },
   {
     code: "en-GB",
@@ -67,7 +67,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "English (UK)",
     flag: "🇬🇧",
     prefix: "en",
-    defaultGreeting: "Good day. Thank you for calling Acme Global. How may I direct your call?",
+    defaultGreeting: "Good day. Thank you for calling. How may I direct your call?",
   },
   {
     code: "es-ES",
@@ -75,7 +75,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Español",
     flag: "🇪🇸",
     prefix: "es",
-    defaultGreeting: "Gracias por llamar a Acme Global. ¿En qué puedo ayudarle hoy?",
+    defaultGreeting: "Gracias por llamar. ¿En qué puedo ayudarle hoy?",
   },
   {
     code: "fr-FR",
@@ -83,7 +83,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Français",
     flag: "🇫🇷",
     prefix: "fr",
-    defaultGreeting: "Bonjour et merci d'avoir contacté Acme Global. Comment puis-je vous aider ?",
+    defaultGreeting: "Bonjour et merci de nous avoir contactés. Comment puis-je vous aider ?",
   },
   {
     code: "de-DE",
@@ -91,7 +91,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Deutsch",
     flag: "🇩🇪",
     prefix: "de",
-    defaultGreeting: "Guten Tag und vielen Dank für Ihren Anruf bei Acme Global. Wie kann ich Ihnen behilflich sein?",
+    defaultGreeting: "Guten Tag und vielen Dank für Ihren Anruf. Wie kann ich Ihnen behilflich sein?",
   },
   {
     code: "it-IT",
@@ -99,7 +99,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Italiano",
     flag: "🇮🇹",
     prefix: "it",
-    defaultGreeting: "Buongiorno, grazie per aver chiamato Acme Global. Come posso esserle utile?",
+    defaultGreeting: "Buongiorno, grazie per aver chiamato. Come posso esserle utile?",
   },
   {
     code: "pt-BR",
@@ -107,7 +107,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Português",
     flag: "🇧🇷",
     prefix: "pt",
-    defaultGreeting: "Olá, obrigado por ligar para a Acme Global. Como posso ajudar você hoje?",
+    defaultGreeting: "Olá, obrigado por ligar. Como posso ajudar você hoje?",
   },
   {
     code: "hi-IN",
@@ -115,7 +115,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "हिन्दी",
     flag: "🇮🇳",
     prefix: "hi",
-    defaultGreeting: "नमस्ते! एक्मे ग्लोबल में कॉल करने के लिए धन्यवाद। आज मैं आपकी क्या सहायता कर सकता हूँ?",
+    defaultGreeting: "नमस्ते! कॉल करने के लिए धन्यवाद। आज मैं आपकी क्या सहायता कर सकता हूँ?",
   },
   {
     code: "ja-JP",
@@ -123,7 +123,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "日本語",
     flag: "🇯🇵",
     prefix: "ja",
-    defaultGreeting: "お電話ありがとうございます。アクメ・グローバルです。本日はどのようなご用件でしょうか？",
+    defaultGreeting: "お電話ありがとうございます。本日はどのようなご用件でしょうか？",
   },
   {
     code: "zh-CN",
@@ -131,7 +131,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "中文 (普通话)",
     flag: "🇨🇳",
     prefix: "zh",
-    defaultGreeting: "您好，感谢致电 Acme Global。请问今天有什么我可以协助您的？",
+    defaultGreeting: "您好，感谢致电。请问今天有什么我可以协助您的？",
   },
   {
     code: "ar-SA",
@@ -139,7 +139,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "العربية",
     flag: "🇸🇦",
     prefix: "ar",
-    defaultGreeting: "أهلاً بك، شكراً لاتصالك بأكمي جلوبال. كيف يمكنني مساعدتك اليوم؟",
+    defaultGreeting: "أهلاً بك، شكراً لاتصالك. كيف يمكنني مساعدتك اليوم؟",
   },
   {
     code: "ru-RU",
@@ -147,7 +147,7 @@ const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
     nativeName: "Русский",
     flag: "🇷🇺",
     prefix: "ru",
-    defaultGreeting: "Здравствуйте! Спасибо за звонок в Acme Global. Чем я могу вам помочь сегодня?",
+    defaultGreeting: "Здравствуйте! Спасибо за звонок. Чем я могу вам помочь сегодня?",
   },
 ];
 
@@ -435,9 +435,7 @@ export default function VoicePlaygroundPage() {
 
   // Outbound Dispatcher State
   const [toPhoneNumber, setToPhoneNumber] = useState("");
-  const [openingMessage, setOpeningMessage] = useState(
-    "Hello! This is Acme Health calling to confirm your upcoming appointment."
-  );
+  const [openingMessage, setOpeningMessage] = useState("");
   const [isCallingOutbound, setIsCallingOutbound] = useState(false);
   const [lastCallResult, setLastCallResult] = useState<OutboundCallResponseData | null>(null);
   const [copied, setCopied] = useState(false);
@@ -1589,15 +1587,7 @@ export default function VoicePlaygroundPage() {
                   </button>
 
                   <button
-                    onClick={() =>
-                      handleStartCall(
-                        selectedLang.code.startsWith("es")
-                          ? "Hola, gracias por llamar a Acme Global. ¿En qué puedo ayudarle hoy?"
-                          : selectedLang.code.startsWith("fr")
-                          ? "Bonjour, merci d'avoir appelé Acme Global. Comment puis-je vous aider ?"
-                          : "Hello, thank you for calling Acme Global. How may I direct your call today?"
-                      )
-                    }
+                    onClick={() => handleStartCall(selectedLang.defaultGreeting)}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-surface-border bg-surface hover:bg-surface-raised text-xs font-semibold text-content-secondary transition-all"
                   >
                     <PhoneIncoming className="h-4 w-4 text-indigo-600" />
@@ -2042,7 +2032,7 @@ export default function VoicePlaygroundPage() {
                 <input
                   type="tel"
                   required
-                  placeholder="+15551234567"
+                  placeholder="+1XXXXXXXXXX"
                   value={toPhoneNumber}
                   onChange={(e) => setToPhoneNumber(e.target.value)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
@@ -2104,7 +2094,7 @@ export default function VoicePlaygroundPage() {
               <br />
               &nbsp;&nbsp;&lt;Say&gt;Connecting you with an account representative...&lt;/Say&gt;
               <br />
-              &nbsp;&nbsp;&lt;Dial&gt;+15551234567&lt;/Dial&gt;
+              &nbsp;&nbsp;&lt;Dial&gt;+1XXXXXXXXXX&lt;/Dial&gt;
               <br />
               &lt;/Response&gt;
             </div>

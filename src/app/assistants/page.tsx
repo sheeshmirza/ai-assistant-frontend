@@ -404,7 +404,7 @@ export default function AssistantsPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Acme Dental Receptionist"
+                  placeholder="e.g. Front Desk Assistant"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring"

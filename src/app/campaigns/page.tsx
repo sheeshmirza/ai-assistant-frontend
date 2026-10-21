@@ -157,7 +157,7 @@ export default function CampaignsPage() {
               <input
                 type={channel === "sms" ? "tel" : "email"}
                 required
-                placeholder={channel === "sms" ? "+15551234567" : "customer@example.com"}
+                placeholder={channel === "sms" ? "+1XXXXXXXXXX" : "customer@example.com"}
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
                 className="w-full text-xs px-3 py-2 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
