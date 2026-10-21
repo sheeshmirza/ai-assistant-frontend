@@ -323,6 +323,19 @@ class APIClient {
     });
   }
 
+export interface ConversationTurn {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ConversationSessionData {
+  history?: ConversationTurn[];
+  context?: Record<string, unknown>;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+  entities?: Record<string, unknown>;
+}
+
   // Conversations & Communications
   async sendChat(
     orgId: string,
@@ -332,6 +345,8 @@ class APIClient {
       message: string;
       channel?: "chat" | "voice" | string;
       language?: string;
+      history?: ConversationTurn[];
+      conversationData?: ConversationSessionData;
     }
   ) {
     const payload: {
@@ -340,6 +355,8 @@ class APIClient {
       conversationId?: string;
       channel?: string;
       language?: string;
+      history?: ConversationTurn[];
+      conversationData?: ConversationSessionData;
     } = {
       assistantId: data.assistantId,
       message: data.message,
@@ -352,6 +369,12 @@ class APIClient {
     }
     if (data.language && data.language.trim()) {
       payload.language = data.language.trim();
+    }
+    if (data.history && data.history.length > 0) {
+      payload.history = data.history;
+    }
+    if (data.conversationData) {
+      payload.conversationData = data.conversationData;
     }
     return this.request<ChatResponseData>(`/api/organizations/${orgId}/chat`, {
       method: "POST",
