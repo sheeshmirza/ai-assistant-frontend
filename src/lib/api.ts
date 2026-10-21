@@ -326,9 +326,21 @@ class APIClient {
   // Conversations & Communications
   async sendChat(
     orgId: string,
-    data: { assistantId: string; conversationId?: string; message: string; channel?: "chat" | "voice" | string }
+    data: {
+      assistantId: string;
+      conversationId?: string;
+      message: string;
+      channel?: "chat" | "voice" | string;
+      language?: string;
+    }
   ) {
-    const payload: { assistantId: string; message: string; conversationId?: string; channel?: string } = {
+    const payload: {
+      assistantId: string;
+      message: string;
+      conversationId?: string;
+      channel?: string;
+      language?: string;
+    } = {
       assistantId: data.assistantId,
       message: data.message,
     };
@@ -337,6 +349,9 @@ class APIClient {
     }
     if (data.channel) {
       payload.channel = data.channel;
+    }
+    if (data.language && data.language.trim()) {
+      payload.language = data.language.trim();
     }
     return this.request<ChatResponseData>(`/api/organizations/${orgId}/chat`, {
       method: "POST",
