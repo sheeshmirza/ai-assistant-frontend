@@ -258,6 +258,7 @@ export default function VoicePlaygroundPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const freqBufferRef = useRef<Uint8Array | null>(null);
 
   // Scroll transcript to bottom
   const scrollToBottom = () => {
@@ -351,8 +352,11 @@ export default function VoicePlaygroundPage() {
       // Read real microphone frequencies if active
       let freqData: Uint8Array | null = null;
       if (analyserRef.current && !isMicMuted && (callState === "listening" || callState === "connected")) {
-        freqData = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(freqData);
+        if (!freqBufferRef.current || freqBufferRef.current.length !== analyserRef.current.frequencyBinCount) {
+          freqBufferRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+        }
+        (analyserRef.current as any).getByteFrequencyData(freqBufferRef.current);
+        freqData = freqBufferRef.current;
       }
 
       const centerY = height / 2;
