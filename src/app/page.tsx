@@ -43,7 +43,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-base sm:text-lg text-content-secondary max-w-2xl mx-auto leading-relaxed">
-            Deploy configurable AI assistants across inbound calls, outbound campaigns, and multi-channel chat. Powered by OpenAI, Qdrant RAG, and autonomous Model Context Protocol (MCP) action execution.
+            Deploy configurable AI assistants across inbound calls, outbound campaigns, and multi-channel chat. Powered by Google Gemini AI, Qdrant RAG, and autonomous Model Context Protocol (MCP) action execution.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">

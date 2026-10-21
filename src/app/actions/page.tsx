@@ -187,7 +187,7 @@ export default function MCPActionsPage() {
           </div>
           <h3 className="text-xs font-bold text-content-primary mb-1">Autonomous Function Calling</h3>
           <p className="text-[11px] text-content-muted leading-relaxed">
-            The OpenAI LLM determines when to call a tool based on the user's intent, executes it, and feeds results back into conversational memory.
+            Google Gemini AI determines when to call a tool based on the user's intent, executes it, and feeds results back into conversational memory.
           </p>
         </div>
 
