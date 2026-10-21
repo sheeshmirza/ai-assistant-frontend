@@ -26,7 +26,7 @@ const navGroups = [
       { label: "Overview", href: "/overview", icon: LayoutDashboard },
       { label: "Assistants", href: "/assistants", icon: Bot },
       { label: "Chat Playground", href: "/chat", icon: MessageSquare },
-      { label: "Voice & Phone", href: "/voice", icon: PhoneCall },
+      { label: "Voice Playground", href: "/voice", icon: PhoneCall },
       { label: "Outbound Outreach", href: "/campaigns", icon: Send },
     ],
   },

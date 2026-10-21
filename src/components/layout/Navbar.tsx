@@ -57,7 +57,7 @@ export default function Navbar({
     { label: "Overview", href: "/overview" },
     { label: "Assistants", href: "/assistants" },
     { label: "Chat", href: "/chat" },
-    { label: "Voice", href: "/voice" },
+    { label: "Voice Playground", href: "/voice" },
     { label: "Transcripts", href: "/transcripts" },
     { label: "MCP Tools", href: "/actions" },
   ];

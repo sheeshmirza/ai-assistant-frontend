@@ -326,14 +326,17 @@ class APIClient {
   // Conversations & Communications
   async sendChat(
     orgId: string,
-    data: { assistantId: string; conversationId?: string; message: string }
+    data: { assistantId: string; conversationId?: string; message: string; channel?: "chat" | "voice" | string }
   ) {
-    const payload: { assistantId: string; message: string; conversationId?: string } = {
+    const payload: { assistantId: string; message: string; conversationId?: string; channel?: string } = {
       assistantId: data.assistantId,
       message: data.message,
     };
     if (data.conversationId && data.conversationId.trim()) {
       payload.conversationId = data.conversationId.trim();
+    }
+    if (data.channel) {
+      payload.channel = data.channel;
     }
     return this.request<ChatResponseData>(`/api/organizations/${orgId}/chat`, {
       method: "POST",
