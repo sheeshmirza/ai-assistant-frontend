@@ -14,7 +14,6 @@ import {
   Wrench,
   BookOpen,
   Building,
-  Settings,
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
@@ -45,10 +44,9 @@ const navGroups = [
     ],
   },
   {
-    title: "Account & Settings",
+    title: "Account",
     items: [
       { label: "Organizations", href: "/organizations", icon: Building },
-      { label: "Platform Settings", href: "/settings", icon: Settings },
     ],
   },
 ];

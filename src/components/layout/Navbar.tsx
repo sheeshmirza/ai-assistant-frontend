@@ -190,12 +190,12 @@ export default function Navbar({
                     <p className="text-[11px] text-content-muted truncate">{user.email}</p>
                   </div>
                   <Link
-                    href="/settings"
+                    href="/organizations"
                     onClick={() => setUserDropdownOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-xs text-content-secondary hover:bg-surface-raised transition-colors"
                   >
-                    <SettingsIcon className="h-3.5 w-3.5 text-content-muted" />
-                    Settings & API Keys
+                    <Building className="h-3.5 w-3.5 text-content-muted" />
+                    Organizations
                   </Link>
                   <button
                     onClick={() => {
