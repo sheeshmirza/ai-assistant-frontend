@@ -220,7 +220,14 @@ export default function AssistantsPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          {["all", "appointment_booking", "customer_support", "sales"].map((uc) => (
+          {[
+            "all",
+            "appointment_booking",
+            "inbound_query_handling",
+            "selling",
+            "outreach",
+            "cold_outreach",
+          ].map((uc) => (
             <button
               key={uc}
               onClick={() => setSelectedUseCase(uc)}

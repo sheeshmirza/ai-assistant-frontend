@@ -65,8 +65,8 @@ export default function ChatPlaygroundPage() {
           setSelectedAssistantId(list[0].id);
         }
 
-        // Generate fresh conversation ID
-        setConversationId(`chat-${Math.random().toString(36).substring(2, 9)}`);
+        // Initialize with empty conversationId so backend creates a persistent conversation session
+        setConversationId("");
       } catch (err: any) {
         toastError(err?.message || "Failed to load assistants");
       } finally {
@@ -98,15 +98,19 @@ export default function ChatPlaygroundPage() {
     try {
       const res = await api.sendChat(currentOrg.id, {
         assistantId: selectedAssistantId,
-        conversationId,
+        conversationId: conversationId || undefined,
         message: userText,
       });
+
+      if (res.conversationId && res.conversationId !== conversationId) {
+        setConversationId(res.conversationId);
+      }
 
       const assistantBubble: MessageBubble = {
         id: Math.random().toString(36).substring(2, 9),
         role: "assistant",
         content: res.reply,
-        actionsTaken: res.actionsTaken,
+        actionsTaken: res.actionsTaken || (res as any).actions_taken,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 
@@ -119,7 +123,7 @@ export default function ChatPlaygroundPage() {
   };
 
   const resetConversation = () => {
-    setConversationId(`chat-${Math.random().toString(36).substring(2, 9)}`);
+    setConversationId("");
     setMessages([]);
   };
 
