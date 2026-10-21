@@ -9,3 +9,4 @@ export function LoadingState({ message = "Loading data..." }: { message?: string
     </div>
   );
 }
+
