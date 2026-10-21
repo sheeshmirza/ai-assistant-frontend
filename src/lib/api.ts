@@ -286,6 +286,12 @@ class APIClient {
     return this.request<Organization>(`/api/organizations/${orgId}`);
   }
 
+  async deleteOrganization(orgId: string) {
+    return this.request<{ success: boolean; organizationId: string }>(`/api/organizations/${orgId}`, {
+      method: "DELETE",
+    });
+  }
+
   // Assistants
   async listAssistants(orgId: string) {
     return this.request<Assistant[]>(`/api/organizations/${orgId}/assistants`);
@@ -433,6 +439,44 @@ class APIClient {
       {
         method: "POST",
       }
+    );
+  }
+
+  // Knowledge Base (RAG Qdrant Vector Storage)
+  async ingestKnowledge(
+    orgId: string,
+    data: {
+      knowledgeBase: string;
+      text: string;
+      metadata?: Record<string, unknown>;
+    }
+  ) {
+    return this.request<{ id: string }>(`/api/organizations/${orgId}/knowledge/ingest`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async searchKnowledge(
+    orgId: string,
+    data: {
+      knowledgeBase: string;
+      query: string;
+      topK?: number;
+    }
+  ) {
+    return this.request<{ results: VectorSearchResult[] }>(
+      `/api/organizations/${orgId}/knowledge/search`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async listKnowledgeCollections(orgId: string) {
+    return this.request<{ collections: string[] }>(
+      `/api/organizations/${orgId}/knowledge/collections`
     );
   }
 

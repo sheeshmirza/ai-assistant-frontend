@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   createOrganization: (name: string) => Promise<Organization>;
+  deleteOrganization: (orgId: string) => Promise<void>;
   selectOrganization: (orgId: string) => void;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -107,6 +108,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return newOrg;
   };
 
+  const deleteOrganization = async (orgId: string): Promise<void> => {
+    await api.deleteOrganization(orgId);
+    const remaining = organizations.filter((o) => o.id !== orgId);
+    setOrganizations(remaining);
+    if (currentOrg?.id === orgId) {
+      const nextOrg = remaining[0] || null;
+      setCurrentOrg(nextOrg);
+      if (typeof window !== "undefined") {
+        if (nextOrg) {
+          localStorage.setItem(ORG_KEY, nextOrg.id);
+        } else {
+          localStorage.removeItem(ORG_KEY);
+        }
+      }
+    }
+  };
+
   const selectOrganization = (orgId: string) => {
     const org = organizations.find((o) => o.id === orgId) || null;
     setCurrentOrg(org);
@@ -144,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         createOrganization,
+        deleteOrganization,
         selectOrganization,
         logout,
         refresh,
