@@ -92,14 +92,31 @@ export default function ChatPlaygroundPage() {
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
+    // Extract prior messages to retain full session context in the request payload
+    const priorHistory = messages.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     setMessages((prev) => [...prev, userBubble]);
     setIsSending(true);
 
     try {
+      const activeAssistant = assistants.find((a) => a.id === selectedAssistantId);
       const res = await api.sendChat(currentOrg.id, {
         assistantId: selectedAssistantId,
         conversationId: conversationId || undefined,
         message: userText,
+        channel: "chat",
+        history: priorHistory,
+        conversationData: {
+          history: priorHistory,
+          context: {
+            channel: "chat",
+            use_case: activeAssistant?.useCase || "general",
+            total_prior_turns: messages.length,
+          },
+        },
       });
 
       if (res.conversationId && res.conversationId !== conversationId) {

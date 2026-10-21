@@ -112,6 +112,19 @@ export interface ChatResponseData {
   actions_taken?: ActionTaken[];
 }
 
+export interface ConversationTurn {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ConversationSessionData {
+  history?: ConversationTurn[];
+  context?: Record<string, unknown>;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+  entities?: Record<string, unknown>;
+}
+
 export interface OutboundMessageResponseData {
   message: string;
   conversationId: string;
@@ -322,19 +335,6 @@ class APIClient {
       method: "DELETE",
     });
   }
-
-export interface ConversationTurn {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-export interface ConversationSessionData {
-  history?: ConversationTurn[];
-  context?: Record<string, unknown>;
-  summary?: string;
-  metadata?: Record<string, unknown>;
-  entities?: Record<string, unknown>;
-}
 
   // Conversations & Communications
   async sendChat(

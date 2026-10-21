@@ -454,6 +454,10 @@ export default function VoicePlaygroundPage() {
   // STT Fast Silence / End-of-Utterance (EOU) Detection Refs
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingTurnRef = useRef<boolean>(false);
+  const callTurnsRef = useRef<CallTurn[]>([]);
+  callTurnsRef.current = callTurns;
+  const callDurationRef = useRef<number>(0);
+  callDurationRef.current = callDuration;
 
   // Canvas Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -848,6 +852,12 @@ export default function VoicePlaygroundPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       };
 
+      // Extract prior turns to transmit conversation context directly within request
+      const priorHistory = callTurnsRef.current.slice(-10).map((t) => ({
+        role: t.role,
+        content: t.content,
+      }));
+
       setCallTurns((prev) => [...prev, userTurn]);
       setCallState("thinking");
 
@@ -859,6 +869,17 @@ export default function VoicePlaygroundPage() {
           message: userText,
           channel: "voice",
           language: selectedLang.name,
+          history: priorHistory,
+          conversationData: {
+            history: priorHistory,
+            context: {
+              channel: "voice",
+              language: selectedLang.name,
+              locale: selectedLang.code,
+              call_duration_seconds: callDurationRef.current,
+              use_case: activeAssistant?.useCase || "general",
+            },
+          },
         });
 
         const roundtrip = Math.round(performance.now() - t0);
