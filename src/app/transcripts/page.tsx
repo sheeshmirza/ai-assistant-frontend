@@ -160,73 +160,102 @@ export default function TranscriptsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {transcripts.map((entry) => (
-            <div
-              key={entry.id}
-              className="p-5 rounded-2xl border border-surface-border bg-surface hover:border-surface-borderHover transition-all space-y-3"
-            >
-              <div className="flex items-center justify-between text-xs border-b border-surface-border pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                      entry.role === "user"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-surface-raised text-content-primary border border-surface-border"
-                    }`}
-                  >
-                    {entry.role === "user" ? <UserIcon className="h-3 w-3" /> : <Bot className="h-3 w-3 text-indigo-600" />}
+          {transcripts.map((entry) => {
+            const actions = entry.actionsTaken || entry.metadata?.actions_taken || [];
+            const hasMessages = entry.messages && entry.messages.length > 0;
+
+            return (
+              <div
+                key={entry.id}
+                className="p-5 rounded-2xl border border-surface-border bg-surface hover:border-surface-borderHover transition-all space-y-3"
+              >
+                {/* Header with Conversation ID and Timestamp */}
+                <div className="flex items-center justify-between text-xs border-b border-surface-border pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-content-primary">
+                      {entry.channel ? entry.channel.toUpperCase() : "CHAT"} Dialogue
+                    </span>
+                    <span className="text-content-muted">•</span>
+                    <span className="font-mono text-[11px] text-content-muted truncate max-w-[240px]">
+                      {entry.conversationId}
+                    </span>
                   </div>
-                  <span className="font-semibold text-content-primary capitalize">{entry.role} Turn</span>
-                  <span className="text-content-muted">•</span>
-                  <span className="font-mono text-[11px] text-content-muted truncate max-w-[200px]">
-                    {entry.conversationId}
-                  </span>
+
+                  <div className="text-[11px] text-content-muted font-mono">
+                    {new Date(entry.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </div>
                 </div>
 
-                <div className="text-[11px] text-content-muted font-mono">
-                  {new Date(entry.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })}
-                </div>
-              </div>
-
-              {/* Message Content */}
-              <div className="text-xs text-content-primary whitespace-pre-wrap leading-relaxed pl-8">
-                {entry.content}
-              </div>
-
-              {/* Audited Actions Taken */}
-              {entry.actionsTaken && entry.actionsTaken.length > 0 && (
-                <div className="ml-8 p-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 text-xs space-y-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                    <Wrench className="h-3.5 w-3.5" />
-                    <span>Audited MCP Actions ({entry.actionsTaken.length})</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {entry.actionsTaken.map((act, i) => (
-                      <div key={i} className="p-2 rounded-lg bg-surface border border-surface-border text-[11px]">
-                        <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                          {act.name}
+                {/* Multi-turn Messages from MongoDB */}
+                {hasMessages ? (
+                  <div className="space-y-2.5">
+                    {entry.messages!.map((msg, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs">
+                        <div
+                          className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                            msg.role === "user"
+                              ? "bg-indigo-600 text-white"
+                              : "bg-surface-raised text-content-primary border border-surface-border"
+                          }`}
+                        >
+                          {msg.role === "user" ? (
+                            <UserIcon className="h-3 w-3" />
+                          ) : (
+                            <Bot className="h-3 w-3 text-indigo-600" />
+                          )}
                         </div>
-                        {act.arguments && (
-                          <pre className="mt-1 text-[10px] font-mono text-content-muted overflow-x-auto">
-                            Arguments: {JSON.stringify(act.arguments, null, 2)}
-                          </pre>
-                        )}
-                        {act.result && (
-                          <pre className="mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 overflow-x-auto">
-                            Result: {JSON.stringify(act.result, null, 2)}
-                          </pre>
-                        )}
+                        <div className="flex-1">
+                          <div className="text-[10px] text-content-muted uppercase tracking-wider font-semibold mb-0.5">
+                            {msg.role}
+                          </div>
+                          <div className="text-xs text-content-primary whitespace-pre-wrap leading-relaxed">
+                            {msg.content}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                ) : (
+                  <div className="text-xs text-content-primary whitespace-pre-wrap leading-relaxed pl-8">
+                    {entry.content}
+                  </div>
+                )}
+
+                {/* Audited Actions Taken */}
+                {actions.length > 0 && (
+                  <div className="mt-3 p-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 text-xs space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                      <Wrench className="h-3.5 w-3.5" />
+                      <span>Audited MCP Actions ({actions.length})</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {actions.map((act, i) => (
+                        <div key={i} className="p-2 rounded-lg bg-surface border border-surface-border text-[11px]">
+                          <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {act.name}
+                          </div>
+                          {act.arguments && (
+                            <pre className="mt-1 text-[10px] font-mono text-content-muted overflow-x-auto">
+                              Arguments: {JSON.stringify(act.arguments, null, 2)}
+                            </pre>
+                          )}
+                          {act.result && (
+                            <pre className="mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 overflow-x-auto">
+                              Result: {JSON.stringify(act.result, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
