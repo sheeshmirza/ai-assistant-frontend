@@ -170,11 +170,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-xs text-content-muted">
-          <span>Standard dev credentials: </span>
-          <span className="font-mono text-[11px] text-content-primary">demo@example.test / ChangeMe-Only-For-Local-Development!</span>
-        </div>
       </div>
     </div>
   );

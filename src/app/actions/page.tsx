@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
+import { api } from "@/lib/api";
 import {
   Wrench,
   CheckCircle2,
@@ -25,7 +26,6 @@ interface MCPToolCard {
   description: string;
   icon: any;
   parameters: Record<string, string>;
-  samplePayload: Record<string, any>;
 }
 
 const BUILTIN_TOOLS: MCPToolCard[] = [
@@ -43,12 +43,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
       service_type: "string (required)",
       notes: "string (optional)",
     },
-    samplePayload: {
-      customer_name: "Jane Smith",
-      customer_email: "jane@example.com",
-      start_time: "2026-10-22T14:00:00Z",
-      service_type: "Dental Checkup",
-    },
   },
   {
     name: "schedule_calendar_event",
@@ -62,12 +56,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
       attendees: "array of emails (optional)",
       description: "string (optional)",
     },
-    samplePayload: {
-      event_title: "Product Demo: AI Assistant Platform",
-      start_time: "2026-10-22T15:00:00Z",
-      end_time: "2026-10-22T15:30:00Z",
-      attendees: ["client@example.com"],
-    },
   },
   {
     name: "send_email",
@@ -80,11 +68,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
       body: "string (required)",
       cc: "string (optional)",
     },
-    samplePayload: {
-      to: "client@example.com",
-      subject: "Appointment Confirmation",
-      body: "Hi Jane, your appointment is confirmed for tomorrow at 2:00 PM.",
-    },
   },
   {
     name: "send_sms",
@@ -94,10 +77,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
     parameters: {
       to: "string E.164 (required)",
       body: "string (required)",
-    },
-    samplePayload: {
-      to: "+15551234567",
-      body: "Acme Health: Your checkup is confirmed for tomorrow at 2 PM.",
     },
   },
   {
@@ -112,12 +91,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
       company: "string (optional)",
       interest: "string (optional)",
     },
-    samplePayload: {
-      name: "Alex Johnson",
-      email: "alex@enterprise.com",
-      company: "Acme Corp",
-      interest: "Enterprise Voice Agents",
-    },
   },
   {
     name: "transfer_call",
@@ -127,10 +100,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
     parameters: {
       target_phone_number: "string E.164 (required)",
       reason: "string (optional)",
-    },
-    samplePayload: {
-      target_phone_number: "+15559876543",
-      reason: "Customer requested billing department",
     },
   },
   {
@@ -142,11 +111,6 @@ const BUILTIN_TOOLS: MCPToolCard[] = [
       form_id: "string (required)",
       form_url: "string (required)",
       fields: "key-value object (required)",
-    },
-    samplePayload: {
-      form_id: "intake-form-101",
-      form_url: "https://docs.google.com/forms/d/e/.../formResponse",
-      fields: { "entry.101": "Jane Smith" },
     },
   },
 ];
@@ -162,13 +126,14 @@ export default function MCPActionsPage() {
 
   const openTestModal = (tool: MCPToolCard) => {
     setActiveTestTool(tool);
-    setTestPayload(JSON.stringify(tool.samplePayload, null, 2));
+    const template = Object.fromEntries(Object.keys(tool.parameters).map((k) => [k, ""]));
+    setTestPayload(JSON.stringify(template, null, 2));
     setExecutionResult(null);
   };
 
   const handleExecuteTest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTestTool) return;
+    if (!activeTestTool || !currentOrg) return;
 
     let parsedArgs: any = {};
     try {
@@ -181,17 +146,13 @@ export default function MCPActionsPage() {
     setIsExecuting(true);
     setExecutionResult(null);
 
-    // Simulated test dispatcher (connects to Python AI service MCP webhook router)
     try {
-      await new Promise((res) => setTimeout(res, 600));
-      setExecutionResult({
-        success: true,
-        action: activeTestTool.name,
-        dispatched_at: new Date().toISOString(),
-        status: "webhook_simulated_success",
-        data: parsedArgs,
+      const res = await api.executeAction(currentOrg.id, {
+        name: activeTestTool.name,
+        arguments: parsedArgs,
       });
-      toastSuccess(`Executed test for ${activeTestTool.name}`);
+      setExecutionResult(res);
+      toastSuccess(`Executed action ${activeTestTool.name}`);
     } catch (err: any) {
       toastError(err?.message || "Test execution failed");
     } finally {

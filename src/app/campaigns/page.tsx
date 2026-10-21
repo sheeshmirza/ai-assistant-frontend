@@ -24,9 +24,7 @@ export default function CampaignsPage() {
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>("");
   const [channel, setChannel] = useState<"sms" | "email">("sms");
   const [recipient, setRecipient] = useState("");
-  const [objective, setObjective] = useState(
-    "Remind patient about tomorrow's fasting requirement prior to dental surgery."
-  );
+  const [objective, setObjective] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [lastResult, setLastResult] = useState<OutboundMessageResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

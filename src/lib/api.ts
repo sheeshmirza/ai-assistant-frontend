@@ -480,6 +480,21 @@ class APIClient {
     );
   }
 
+  // Model Context Protocol (MCP Actions)
+  async executeAction(
+    orgId: string,
+    data: {
+      name: string;
+      arguments: Record<string, any>;
+      enabled_actions?: string[];
+    }
+  ) {
+    return this.request<any>(`/api/organizations/${orgId}/actions/execute`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   // Direct AI Runtime Queries (Optional fallback / diagnostics)
   async getAiServiceHealth() {
     return this.request<{ service: string; version: string }>("/", {}, getAiServiceUrl());
