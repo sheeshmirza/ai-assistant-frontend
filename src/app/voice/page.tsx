@@ -184,6 +184,9 @@ function playDtmfTone(char: string) {
 
   try {
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const freqs = DTMF_FREQS[char];
     if (!freqs) return;
 
@@ -191,7 +194,7 @@ function playDtmfTone(char: string) {
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
 
     osc1.frequency.value = freqs[0];
@@ -223,13 +226,16 @@ function startRingbackTone(): () => void {
 
   try {
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc1.frequency.value = 440;
     osc2.frequency.value = 480;
-    gain.gain.value = 0.05;
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
 
     osc1.connect(gain);
     osc2.connect(gain);
@@ -241,7 +247,7 @@ function startRingbackTone(): () => void {
     let ringOn = true;
     const interval = setInterval(() => {
       ringOn = !ringOn;
-      gain.gain.setValueAtTime(ringOn ? 0.05 : 0.0001, ctx.currentTime);
+      gain.gain.setValueAtTime(ringOn ? 0.08 : 0.0001, ctx.currentTime);
     }, 1500);
 
     return () => {
@@ -266,6 +272,9 @@ function startHoldMusic(): () => void {
 
   try {
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     let isStopped = false;
 
     // Harmonic chord progression: Cmaj7 - Fmaj7 warm telephone chords
@@ -326,13 +335,16 @@ function playPickupTone() {
 
   try {
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.frequency.setValueAtTime(800, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.06);
 
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
 
     osc.connect(gain);
@@ -356,11 +368,14 @@ function playHangupTone() {
 
   try {
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.frequency.setValueAtTime(480, ctx.currentTime);
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
 
     osc.connect(gain);
@@ -433,6 +448,8 @@ export default function VoicePlaygroundPage() {
   const ringbackStopperRef = useRef<(() => void) | null>(null);
   const holdMusicStopperRef = useRef<(() => void) | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const resumeWatchdogRef = useRef<NodeJS.Timeout | null>(null);
 
   // STT Fast Silence / End-of-Utterance (EOU) Detection Refs
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -685,67 +702,132 @@ export default function VoicePlaygroundPage() {
         .replace(/[-•]\s+/g, "")
         .trim();
 
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
-      utterance.rate = selectedVoiceRate;
-      utterance.pitch = 1.0;
-      utterance.lang = selectedLang.code;
-
-      // Select voice matching active language
-      const allVoices = window.speechSynthesis.getVoices();
-      let chosenVoice: SpeechSynthesisVoice | undefined;
-
-      if (selectedVoiceName !== "auto") {
-        chosenVoice = allVoices.find((v) => v.name === selectedVoiceName);
-      }
-
-      if (!chosenVoice) {
-        // Filter by current language prefix first
-        const langVoices = allVoices.filter((v) =>
-          v.lang.toLowerCase().startsWith(selectedLang.prefix.toLowerCase())
-        );
-
-        chosenVoice =
-          langVoices.find(
-            (v) =>
-              v.name.includes("Natural") ||
-              v.name.includes("Google") ||
-              v.name.includes("Samantha") ||
-              v.name.includes("Premium") ||
-              v.name.includes("Siri") ||
-              v.name.includes("Enhanced")
-          ) ||
-          langVoices[0] ||
-          allVoices.find((v) => v.lang.startsWith("en"));
-      }
-
-      if (chosenVoice) utterance.voice = chosenVoice;
-
-      utterance.onstart = () => {
-        setCallState("speaking");
-      };
-
-      utterance.onend = () => {
+      if (!cleanSpokenText) {
         setCallState("connected");
         if (onDone) onDone();
-      };
+        return;
+      }
 
-      utterance.onerror = () => {
-        setCallState("connected");
-        if (onDone) onDone();
-      };
+      // Clear any prior watchdog timer
+      if (resumeWatchdogRef.current) {
+        clearInterval(resumeWatchdogRef.current);
+        resumeWatchdogRef.current = null;
+      }
 
-      // Chromium freeze watchdog (prevents speech stall on long sentences)
-      const resumeWatchdog = setInterval(() => {
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.pause();
+      const executeSpeak = () => {
+        try {
+          // Unpause Chromium speech engine
           window.speechSynthesis.resume();
-        } else {
-          clearInterval(resumeWatchdog);
-        }
-      }, 4000);
 
-      window.speechSynthesis.speak(utterance);
+          const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
+          activeUtteranceRef.current = utterance; // Retain reference to prevent V8 garbage collection!
+
+          utterance.rate = selectedVoiceRate;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          // Select voice matching active language
+          const allVoices = window.speechSynthesis.getVoices();
+          let chosenVoice: SpeechSynthesisVoice | undefined;
+
+          if (selectedVoiceName !== "auto") {
+            chosenVoice = allVoices.find((v) => v.name === selectedVoiceName);
+          }
+
+          if (!chosenVoice) {
+            // Filter by current language prefix first
+            const langVoices = allVoices.filter((v) =>
+              v.lang.toLowerCase().startsWith(selectedLang.prefix.toLowerCase())
+            );
+
+            chosenVoice =
+              langVoices.find(
+                (v) =>
+                  v.name.includes("Natural") ||
+                  v.name.includes("Google") ||
+                  v.name.includes("Samantha") ||
+                  v.name.includes("Premium") ||
+                  v.name.includes("Siri") ||
+                  v.name.includes("Enhanced")
+              ) || langVoices[0];
+          }
+
+          if (chosenVoice) {
+            utterance.voice = chosenVoice;
+            utterance.lang = chosenVoice.lang;
+          } else {
+            utterance.lang = selectedLang.code;
+          }
+
+          let hasEnded = false;
+          const finish = () => {
+            if (hasEnded) return;
+            hasEnded = true;
+            if (resumeWatchdogRef.current) {
+              clearInterval(resumeWatchdogRef.current);
+              resumeWatchdogRef.current = null;
+            }
+            activeUtteranceRef.current = null;
+            setCallState("connected");
+            if (onDone) onDone();
+          };
+
+          utterance.onstart = () => {
+            setCallState("speaking");
+          };
+
+          utterance.onend = () => {
+            finish();
+          };
+
+          utterance.onerror = (e: any) => {
+            console.warn("SpeechSynthesis event:", e?.error);
+            if (e?.error && e?.error !== "canceled" && e?.error !== "interrupted") {
+              // Try one fallback attempt with system default if specific voice had an issue
+              try {
+                const fallbackUtterance = new SpeechSynthesisUtterance(cleanSpokenText);
+                fallbackUtterance.rate = selectedVoiceRate;
+                fallbackUtterance.volume = 1.0;
+                fallbackUtterance.onend = () => finish();
+                fallbackUtterance.onerror = () => finish();
+                activeUtteranceRef.current = fallbackUtterance;
+                window.speechSynthesis.speak(fallbackUtterance);
+                return;
+              } catch {}
+            }
+            finish();
+          };
+
+          // Chromium unfreeze watchdog (prevents speech stall on long sentences)
+          resumeWatchdogRef.current = setInterval(() => {
+            if (typeof window !== "undefined" && "speechSynthesis" in window) {
+              if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+              } else if (resumeWatchdogRef.current) {
+                clearInterval(resumeWatchdogRef.current);
+                resumeWatchdogRef.current = null;
+              }
+            }
+          }, 3500);
+
+          window.speechSynthesis.resume();
+          window.speechSynthesis.speak(utterance);
+        } catch (err) {
+          console.error("SpeechSynthesis execution error:", err);
+          setCallState("connected");
+          if (onDone) onDone();
+        }
+      };
+
+      // In Chromium, calling cancel() immediately followed by speak() drops the utterance.
+      // If speech is currently ongoing, cancel and wait a brief tick for the cancel to settle.
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+        setTimeout(executeSpeak, 60);
+      } else {
+        executeSpeak();
+      }
     },
     [isSpeakerEnabled, selectedVoiceName, selectedVoiceRate, selectedLang]
   );
@@ -860,19 +942,17 @@ export default function VoicePlaygroundPage() {
       recognition.onresult = (event: any) => {
         if (isProcessingTurnRef.current) return;
 
-        let interimStr = "";
-        let finalStr = "";
+        let fullTranscript = "";
+        let hasFinalResult = false;
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalStr += transcript;
-          } else {
-            interimStr += transcript;
+            hasFinalResult = true;
           }
         }
 
-        const currentSaid = (finalStr || interimStr).trim();
+        const currentSaid = fullTranscript.trim();
         if (currentSaid) {
           setLiveCallerTranscript(currentSaid);
 
@@ -880,7 +960,7 @@ export default function VoicePlaygroundPage() {
           // If caller stops speaking for 800ms, immediately dispatch the turn!
           if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
 
-          const debounceDelay = finalStr ? 350 : 850;
+          const debounceDelay = hasFinalResult ? 400 : 900;
           silenceTimeoutRef.current = setTimeout(() => {
             if (!isProcessingTurnRef.current && currentSaid.length > 0) {
               try {
@@ -893,7 +973,11 @@ export default function VoicePlaygroundPage() {
       };
 
       recognition.onerror = (e: any) => {
-        if (e.error !== "no-speech") {
+        console.warn("Speech recognition event:", e?.error);
+        if (e?.error === "not-allowed" || e?.error === "service-not-allowed") {
+          toastError("Microphone permission denied. Click the lock/site settings in your browser address bar to allow microphone.");
+          setCallState("connected");
+        } else if (e?.error !== "no-speech") {
           setCallState("connected");
         }
       };
@@ -972,23 +1056,53 @@ export default function VoicePlaygroundPage() {
 
       const AudioContextClass =
         window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 128;
-      analyser.smoothingTimeConstant = 0.8;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        if (ctx.state === "suspended") {
+          await ctx.resume().catch(() => {});
+        }
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.8;
 
-      source.connect(analyser);
-      audioContextRef.current = ctx;
-      analyserRef.current = analyser;
-    } catch {
-      // Mic permission blocked or unavailable
+        source.connect(analyser);
+        audioContextRef.current = ctx;
+        analyserRef.current = analyser;
+      }
+    } catch (err: any) {
+      console.warn("Microphone stream note:", err?.message || err);
     }
   };
 
   // Start Voice Call
   const handleStartCall = async (customGreeting?: string) => {
     if (!currentOrg || !selectedAssistantId) return;
+
+    // Immediately prime SpeechSynthesis and WebAudio on user gesture
+    if (typeof window !== "undefined") {
+      if ("speechSynthesis" in window) {
+        try {
+          window.speechSynthesis.resume();
+          // Prime speech engine synchronously in user click handler
+          const primer = new SpeechSynthesisUtterance(" ");
+          primer.volume = 0.01;
+          primer.rate = 2.0;
+          window.speechSynthesis.speak(primer);
+        } catch {}
+      }
+
+      const AudioContextClass =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        try {
+          const testCtx = new AudioContextClass();
+          if (testCtx.state === "suspended") {
+            testCtx.resume().catch(() => {});
+          }
+        } catch {}
+      }
+    }
 
     setCallState("ringing");
     setCallTurns([]);
@@ -1005,8 +1119,8 @@ export default function VoicePlaygroundPage() {
     const stopRingback = startRingbackTone();
     ringbackStopperRef.current = stopRingback;
 
-    // Connect microphone for real-time frequency analysis
-    await startMicrophoneStream();
+    // Connect microphone asynchronously without blocking connection delay
+    startMicrophoneStream().catch(() => {});
 
     // Answer call after realistic 1.5s connection delay
     setTimeout(() => {
