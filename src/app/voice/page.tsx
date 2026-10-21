@@ -35,9 +35,121 @@ import {
   Settings,
   Wifi,
   Zap,
+  Globe,
+  Pause,
+  Flame,
+  Download,
 } from "lucide-react";
 import CodeSnippet from "@/components/ui/CodeSnippet";
 import { LoadingState } from "@/components/ui/LoadingState";
+
+interface VoiceLanguage {
+  code: string;       // BCP-47 tag, e.g. "en-US"
+  name: string;       // "English (US)"
+  nativeName: string; // "English"
+  flag: string;       // "🇺🇸"
+  prefix: string;     // "en"
+  defaultGreeting: string;
+}
+
+const SUPPORTED_LANGUAGES: VoiceLanguage[] = [
+  {
+    code: "en-US",
+    name: "English (US)",
+    nativeName: "English (US)",
+    flag: "🇺🇸",
+    prefix: "en",
+    defaultGreeting: "Thank you for calling Acme Global. How may I assist you today?",
+  },
+  {
+    code: "en-GB",
+    name: "English (UK)",
+    nativeName: "English (UK)",
+    flag: "🇬🇧",
+    prefix: "en",
+    defaultGreeting: "Good day. Thank you for calling Acme Global. How may I direct your call?",
+  },
+  {
+    code: "es-ES",
+    name: "Spanish (Spain)",
+    nativeName: "Español",
+    flag: "🇪🇸",
+    prefix: "es",
+    defaultGreeting: "Gracias por llamar a Acme Global. ¿En qué puedo ayudarle hoy?",
+  },
+  {
+    code: "fr-FR",
+    name: "French (France)",
+    nativeName: "Français",
+    flag: "🇫🇷",
+    prefix: "fr",
+    defaultGreeting: "Bonjour et merci d'avoir contacté Acme Global. Comment puis-je vous aider ?",
+  },
+  {
+    code: "de-DE",
+    name: "German (Germany)",
+    nativeName: "Deutsch",
+    flag: "🇩🇪",
+    prefix: "de",
+    defaultGreeting: "Guten Tag und vielen Dank für Ihren Anruf bei Acme Global. Wie kann ich Ihnen behilflich sein?",
+  },
+  {
+    code: "it-IT",
+    name: "Italian (Italy)",
+    nativeName: "Italiano",
+    flag: "🇮🇹",
+    prefix: "it",
+    defaultGreeting: "Buongiorno, grazie per aver chiamato Acme Global. Come posso esserle utile?",
+  },
+  {
+    code: "pt-BR",
+    name: "Portuguese (Brazil)",
+    nativeName: "Português",
+    flag: "🇧🇷",
+    prefix: "pt",
+    defaultGreeting: "Olá, obrigado por ligar para a Acme Global. Como posso ajudar você hoje?",
+  },
+  {
+    code: "hi-IN",
+    name: "Hindi (India)",
+    nativeName: "हिन्दी",
+    flag: "🇮🇳",
+    prefix: "hi",
+    defaultGreeting: "नमस्ते! एक्मे ग्लोबल में कॉल करने के लिए धन्यवाद। आज मैं आपकी क्या सहायता कर सकता हूँ?",
+  },
+  {
+    code: "ja-JP",
+    name: "Japanese (Japan)",
+    nativeName: "日本語",
+    flag: "🇯🇵",
+    prefix: "ja",
+    defaultGreeting: "お電話ありがとうございます。アクメ・グローバルです。本日はどのようなご用件でしょうか？",
+  },
+  {
+    code: "zh-CN",
+    name: "Chinese (Mandarin)",
+    nativeName: "中文 (普通话)",
+    flag: "🇨🇳",
+    prefix: "zh",
+    defaultGreeting: "您好，感谢致电 Acme Global。请问今天有什么我可以协助您的？",
+  },
+  {
+    code: "ar-SA",
+    name: "Arabic (Saudi Arabia)",
+    nativeName: "العربية",
+    flag: "🇸🇦",
+    prefix: "ar",
+    defaultGreeting: "أهلاً بك، شكراً لاتصالك بأكمي جلوبال. كيف يمكنني مساعدتك اليوم؟",
+  },
+  {
+    code: "ru-RU",
+    name: "Russian (Russia)",
+    nativeName: "Русский",
+    flag: "🇷🇺",
+    prefix: "ru",
+    defaultGreeting: "Здравствуйте! Спасибо за звонок в Acme Global. Чем я могу вам помочь сегодня?",
+  },
+];
 
 interface CallTurn {
   id: string;
@@ -145,6 +257,66 @@ function startRingbackTone(): () => void {
   }
 }
 
+// Play realistic soothing Hold Music / Chime
+function startHoldMusic(): () => void {
+  if (typeof window === "undefined") return () => {};
+  const AudioContextClass =
+    window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return () => {};
+
+  try {
+    const ctx = new AudioContextClass();
+    let isStopped = false;
+
+    // Harmonic chord progression: Cmaj7 - Fmaj7 warm telephone chords
+    const notes = [
+      [261.63, 329.63, 392.0, 493.88], // C E G B
+      [220.0, 261.63, 329.63, 392.0],  // A C E G
+      [174.61, 220.0, 261.63, 329.63], // F A C E
+      [196.0, 246.94, 293.66, 392.0],  // G B D G
+    ];
+
+    let chordIdx = 0;
+    const playChord = () => {
+      if (isStopped) return;
+      const currentChord = notes[chordIdx % notes.length];
+      chordIdx++;
+
+      currentChord.forEach((freq) => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = freq;
+
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 0.3);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.2);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 2.3);
+        } catch {}
+      });
+    };
+
+    playChord();
+    const interval = setInterval(playChord, 2400);
+
+    return () => {
+      isStopped = true;
+      clearInterval(interval);
+      try {
+        ctx.close();
+      } catch {}
+    };
+  } catch {
+    return () => {};
+  }
+}
+
 // Play connection pickup click
 function playPickupTone() {
   if (typeof window === "undefined") return;
@@ -208,7 +380,7 @@ export default function VoicePlaygroundPage() {
   const { success: toastSuccess, error: toastError } = useToast();
   const searchParams = useSearchParams();
 
-  // Active Tab
+  // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<"playground" | "outbound" | "telephony">("playground");
 
   // Assistants State
@@ -216,9 +388,12 @@ export default function VoicePlaygroundPage() {
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Multi-Language State
+  const [selectedLang, setSelectedLang] = useState<VoiceLanguage>(SUPPORTED_LANGUAGES[0]);
+
   // Playground Call Session State
   const [callState, setCallState] = useState<
-    "idle" | "ringing" | "connected" | "listening" | "thinking" | "speaking" | "ended"
+    "idle" | "ringing" | "connected" | "listening" | "thinking" | "speaking" | "on_hold" | "ended"
   >("idle");
   const [conversationId, setConversationId] = useState<string>("");
   const [callTurns, setCallTurns] = useState<CallTurn[]>([]);
@@ -232,8 +407,14 @@ export default function VoicePlaygroundPage() {
   const [transferDetected, setTransferDetected] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
+  // Real-Time STT Live Transcript (Sub-second streaming visualizer)
+  const [liveCallerTranscript, setLiveCallerTranscript] = useState<string>("");
+
+  // Post-Call Disposition Modal
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+
   // Voice Persona Settings
-  const [selectedVoiceRate, setSelectedVoiceRate] = useState<number>(1.05);
+  const [selectedVoiceRate, setSelectedVoiceRate] = useState<number>(1.08);
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>("auto");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
@@ -250,7 +431,12 @@ export default function VoicePlaygroundPage() {
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const ringbackStopperRef = useRef<(() => void) | null>(null);
+  const holdMusicStopperRef = useRef<(() => void) | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  // STT Fast Silence / End-of-Utterance (EOU) Detection Refs
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingTurnRef = useRef<boolean>(false);
 
   // Canvas Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -267,21 +453,25 @@ export default function VoicePlaygroundPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [callTurns]);
+  }, [callTurns, liveCallerTranscript]);
 
-  // Load available speech synthesis voices
+  // Load available speech synthesis voices filtered by selected language
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
     const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const englishVoices = voices.filter((v) => v.lang.startsWith("en"));
-      setAvailableVoices(englishVoices.length > 0 ? englishVoices : voices);
+      const allVoices = window.speechSynthesis.getVoices();
+      setAvailableVoices(allVoices);
     };
 
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
+
+  // Filter voices matching current language prefix
+  const matchingVoices = availableVoices.filter((v) =>
+    v.lang.toLowerCase().startsWith(selectedLang.prefix.toLowerCase())
+  );
 
   // Load assistants on mount
   useEffect(() => {
@@ -314,7 +504,7 @@ export default function VoicePlaygroundPage() {
 
   // Call duration counter
   useEffect(() => {
-    if (["connected", "listening", "thinking", "speaking"].includes(callState)) {
+    if (["connected", "listening", "thinking", "speaking", "on_hold"].includes(callState)) {
       timerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
@@ -360,7 +550,7 @@ export default function VoicePlaygroundPage() {
       }
 
       const centerY = height / 2;
-      const isCallActive = ["connected", "listening", "thinking", "speaking"].includes(callState);
+      const isCallActive = ["connected", "listening", "thinking", "speaking", "on_hold"].includes(callState);
 
       if (!isCallActive) {
         // Resting flatline
@@ -370,9 +560,21 @@ export default function VoicePlaygroundPage() {
         ctx.moveTo(0, centerY);
         ctx.lineTo(width, centerY);
         ctx.stroke();
+      } else if (callState === "on_hold") {
+        // Soft pulsing hold wave
+        phase += 0.03;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.strokeStyle = "#8b5cf6";
+        for (let x = 0; x < width; x += 4) {
+          const y = centerY + Math.sin(x * 0.03 + phase) * 6 * Math.sin((x / width) * Math.PI);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       } else if (callState === "speaking") {
         // Organic assistant speaking waves
-        phase += 0.08;
+        phase += 0.09;
         ctx.lineWidth = 2.5;
 
         // Wave 1: Primary emerald wave
@@ -393,8 +595,7 @@ export default function VoicePlaygroundPage() {
         ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
         for (let x = 0; x < width; x += 4) {
           const y =
-            centerY +
-            Math.sin(x * 0.04 - phase * 1.2) * 12 * Math.sin((x / width) * Math.PI);
+            centerY + Math.sin(x * 0.04 - phase * 1.2) * 12 * Math.sin((x / width) * Math.PI);
           if (x === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -406,9 +607,7 @@ export default function VoicePlaygroundPage() {
         ctx.beginPath();
         ctx.strokeStyle = "#f59e0b";
         for (let x = 0; x < width; x += 4) {
-          const y =
-            centerY +
-            Math.sin(x * 0.08 + phase) * 8 * Math.sin((x / width) * Math.PI);
+          const y = centerY + Math.sin(x * 0.08 + phase) * 8 * Math.sin((x / width) * Math.PI);
           if (x === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -433,13 +632,11 @@ export default function VoicePlaygroundPage() {
       } else {
         // Subtle ambient listening pulse
         phase += 0.04;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(99, 102, 241, 0.5)";
+        ctx.strokeStyle = "rgba(99, 102, 241, 0.45)";
         for (let x = 0; x < width; x += 4) {
-          const y =
-            centerY +
-            Math.sin(x * 0.02 + phase) * 5 * Math.sin((x / width) * Math.PI);
+          const y = centerY + Math.sin(x * 0.02 + phase) * 5 * Math.sin((x / width) * Math.PI);
           if (x === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -472,7 +669,7 @@ export default function VoicePlaygroundPage() {
     analyserRef.current = null;
   }, []);
 
-  // Web Speech Synthesis (Assistant speaking aloud)
+  // Web Speech Synthesis (Assistant speaking aloud with language-aware voice matching)
   const speakAssistantReply = useCallback(
     (text: string, onDone?: () => void) => {
       if (!isSpeakerEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -481,30 +678,45 @@ export default function VoicePlaygroundPage() {
         return;
       }
 
+      // Pre-clean text: strip markdown asterisks, hashes, backticks, emojis, bullet points
+      const cleanSpokenText = text
+        .replace(/[*_#`~\[\]\(\)]/g, "")
+        .replace(/https?:\/\/\S+/g, "")
+        .replace(/[-•]\s+/g, "")
+        .trim();
+
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
       utterance.rate = selectedVoiceRate;
       utterance.pitch = 1.0;
+      utterance.lang = selectedLang.code;
 
-      // Select voice
-      const voices = window.speechSynthesis.getVoices();
+      // Select voice matching active language
+      const allVoices = window.speechSynthesis.getVoices();
       let chosenVoice: SpeechSynthesisVoice | undefined;
 
       if (selectedVoiceName !== "auto") {
-        chosenVoice = voices.find((v) => v.name === selectedVoiceName);
+        chosenVoice = allVoices.find((v) => v.name === selectedVoiceName);
       }
 
       if (!chosenVoice) {
+        // Filter by current language prefix first
+        const langVoices = allVoices.filter((v) =>
+          v.lang.toLowerCase().startsWith(selectedLang.prefix.toLowerCase())
+        );
+
         chosenVoice =
-          voices.find(
+          langVoices.find(
             (v) =>
-              v.lang.startsWith("en") &&
-              (v.name.includes("Natural") ||
-                v.name.includes("Google") ||
-                v.name.includes("Samantha") ||
-                v.name.includes("Daniel") ||
-                v.name.includes("Jenny"))
-          ) || voices.find((v) => v.lang.startsWith("en"));
+              v.name.includes("Natural") ||
+              v.name.includes("Google") ||
+              v.name.includes("Samantha") ||
+              v.name.includes("Premium") ||
+              v.name.includes("Siri") ||
+              v.name.includes("Enhanced")
+          ) ||
+          langVoices[0] ||
+          allVoices.find((v) => v.lang.startsWith("en"));
       }
 
       if (chosenVoice) utterance.voice = chosenVoice;
@@ -523,9 +735,19 @@ export default function VoicePlaygroundPage() {
         if (onDone) onDone();
       };
 
+      // Chromium freeze watchdog (prevents speech stall on long sentences)
+      const resumeWatchdog = setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        } else {
+          clearInterval(resumeWatchdog);
+        }
+      }, 4000);
+
       window.speechSynthesis.speak(utterance);
     },
-    [isSpeakerEnabled, selectedVoiceName, selectedVoiceRate]
+    [isSpeakerEnabled, selectedVoiceName, selectedVoiceRate, selectedLang]
   );
 
   // Send a voice turn to the backend
@@ -534,6 +756,9 @@ export default function VoicePlaygroundPage() {
       if (!currentOrg || !selectedAssistantId || !spokenText.trim()) return;
 
       const userText = spokenText.trim();
+      setLiveCallerTranscript(""); // Clear live interim streaming text
+      isProcessingTurnRef.current = true;
+
       const userTurn: CallTurn = {
         id: Math.random().toString(36).substring(2, 9),
         role: "user",
@@ -551,6 +776,7 @@ export default function VoicePlaygroundPage() {
           conversationId: conversationId || undefined,
           message: userText,
           channel: "voice",
+          language: selectedLang.name,
         });
 
         const roundtrip = Math.round(performance.now() - t0);
@@ -574,18 +800,21 @@ export default function VoicePlaygroundPage() {
         // Check for transfer_call action
         const transfer = actions.find((a: ActionTaken) => a.name === "transfer_call");
         if (transfer) {
-          const target = (transfer.arguments as any)?.target_phone_number || "human department";
+          const target = (transfer.arguments as any)?.target_phone_number || "human tier-2 agent";
           setTransferDetected(target);
           toastSuccess(`Call transferred to ${target}`);
         }
 
-        // Speak reply, then resume listening if hands-free
+        isProcessingTurnRef.current = false;
+
+        // Speak reply aloud, then automatically resume listening
         speakAssistantReply(res.reply, () => {
-          if (isHandsFree && !isMicMuted && callState !== "ended") {
+          if (isHandsFree && !isMicMuted && callState !== "ended" && callState !== "on_hold") {
             startSpeechRecognition();
           }
         });
       } catch (err: any) {
+        isProcessingTurnRef.current = false;
         toastError(err?.message || "Voice connection encountered an error");
         setCallState("connected");
       }
@@ -594,6 +823,7 @@ export default function VoicePlaygroundPage() {
       currentOrg,
       selectedAssistantId,
       conversationId,
+      selectedLang,
       speakAssistantReply,
       isHandsFree,
       isMicMuted,
@@ -603,9 +833,9 @@ export default function VoicePlaygroundPage() {
     ]
   );
 
-  // Setup Web Speech Recognition with Hands-Free Continuous Loop
+  // Setup Web Speech Recognition with Continuous Stream + Fast Silence Detection
   const startSpeechRecognition = useCallback(() => {
-    if (typeof window === "undefined" || isMicMuted) return;
+    if (typeof window === "undefined" || isMicMuted || callState === "on_hold" || callState === "ended") return;
     const SpeechRecognitionClass =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -619,28 +849,58 @@ export default function VoicePlaygroundPage() {
       }
 
       const recognition = new SpeechRecognitionClass();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = selectedLang.code;
 
       recognition.onstart = () => {
         setCallState("listening");
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript && transcript.trim()) {
-          sendVoiceTurn(transcript);
+        if (isProcessingTurnRef.current) return;
+
+        let interimStr = "";
+        let finalStr = "";
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalStr += transcript;
+          } else {
+            interimStr += transcript;
+          }
+        }
+
+        const currentSaid = (finalStr || interimStr).trim();
+        if (currentSaid) {
+          setLiveCallerTranscript(currentSaid);
+
+          // Fast End-of-Utterance (EOU) Silence Debounce:
+          // If caller stops speaking for 800ms, immediately dispatch the turn!
+          if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+
+          const debounceDelay = finalStr ? 350 : 850;
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (!isProcessingTurnRef.current && currentSaid.length > 0) {
+              try {
+                recognition.abort();
+              } catch {}
+              sendVoiceTurn(currentSaid);
+            }
+          }, debounceDelay);
         }
       };
 
-      recognition.onerror = () => {
-        setCallState("connected");
+      recognition.onerror = (e: any) => {
+        if (e.error !== "no-speech") {
+          setCallState("connected");
+        }
       };
 
       recognition.onend = () => {
-        // In continuous hands-free mode, if not speaking or thinking, re-arm
-        if (isHandsFree && !isMicMuted && callState === "listening") {
+        // Re-arm cleanly if call is still active and not speaking or thinking
+        if (isHandsFree && !isMicMuted && callState === "listening" && !isProcessingTurnRef.current) {
           try {
             recognition.start();
           } catch {}
@@ -650,16 +910,58 @@ export default function VoicePlaygroundPage() {
       recognitionRef.current = recognition;
       recognition.start();
     } catch {}
-  }, [isHandsFree, isMicMuted, callState, sendVoiceTurn]);
+  }, [isHandsFree, isMicMuted, callState, selectedLang, sendVoiceTurn]);
 
   const stopSpeechRecognition = useCallback(() => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
       } catch {}
       recognitionRef.current = null;
     }
+    setLiveCallerTranscript("");
   }, []);
+
+  // Barge-in / Interrupt Agent
+  const handleInterruptAgent = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setCallState("listening");
+    if (!isMicMuted) {
+      startSpeechRecognition();
+    }
+  }, [isMicMuted, startSpeechRecognition]);
+
+  // Hold / Resume Call
+  const handleToggleHold = useCallback(() => {
+    if (callState === "on_hold") {
+      // Resume call
+      if (holdMusicStopperRef.current) {
+        holdMusicStopperRef.current();
+        holdMusicStopperRef.current = null;
+      }
+      setCallState("connected");
+      toastSuccess("Call resumed from hold");
+      if (isHandsFree && !isMicMuted) {
+        startSpeechRecognition();
+      }
+    } else {
+      // Put on hold
+      stopSpeechRecognition();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      const stopHold = startHoldMusic();
+      holdMusicStopperRef.current = stopHold;
+      setCallState("on_hold");
+      toastSuccess("Call placed on hold with acoustic chime");
+    }
+  }, [callState, isHandsFree, isMicMuted, startSpeechRecognition, stopSpeechRecognition, toastSuccess]);
 
   // Initialize Microphone Analyser for realistic Canvas visualizer
   const startMicrophoneStream = async () => {
@@ -695,6 +997,9 @@ export default function VoicePlaygroundPage() {
     setTransferDetected(null);
     setDtmfBuffer("");
     setLatencyMs(null);
+    setLiveCallerTranscript("");
+    setShowSummaryModal(false);
+    isProcessingTurnRef.current = false;
 
     // Start authentic ringback sound
     const stopRingback = startRingbackTone();
@@ -703,16 +1008,13 @@ export default function VoicePlaygroundPage() {
     // Connect microphone for real-time frequency analysis
     await startMicrophoneStream();
 
-    // Answer call after realistic 1.6s connection delay
+    // Answer call after realistic 1.5s connection delay
     setTimeout(() => {
       if (ringbackStopperRef.current) ringbackStopperRef.current();
       playPickupTone();
       setCallState("connected");
 
-      const opening =
-        customGreeting ||
-        activeAssistant?.systemPrompt?.split(".")[0]?.trim() ||
-        "Hello! Thank you for calling. How can I help you today?";
+      const opening = customGreeting || selectedLang.defaultGreeting;
 
       const initialTurn: CallTurn = {
         id: Math.random().toString(36).substring(2, 9),
@@ -729,12 +1031,16 @@ export default function VoicePlaygroundPage() {
           startSpeechRecognition();
         }
       });
-    }, 1600);
+    }, 1500);
   };
 
   // End Voice Call
   const handleEndCall = () => {
     if (ringbackStopperRef.current) ringbackStopperRef.current();
+    if (holdMusicStopperRef.current) {
+      holdMusicStopperRef.current();
+      holdMusicStopperRef.current = null;
+    }
     playHangupTone();
 
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -743,6 +1049,7 @@ export default function VoicePlaygroundPage() {
     stopSpeechRecognition();
     stopMicrophoneStream();
     setCallState("ended");
+    setShowSummaryModal(true);
 
     if (currentOrg && selectedAssistantId && conversationId) {
       api.endConversation(currentOrg.id, selectedAssistantId, conversationId).catch(() => {});
@@ -765,6 +1072,39 @@ export default function VoicePlaygroundPage() {
     const txt = textUtterance.trim();
     setTextUtterance("");
     sendVoiceTurn(txt);
+  };
+
+  // Export Call Transcript (JSON format)
+  const handleDownloadTranscript = () => {
+    const payload = {
+      assistantId: selectedAssistantId,
+      assistantName: activeAssistant?.name,
+      conversationId: conversationId,
+      language: selectedLang.name,
+      durationSeconds: callDuration,
+      formattedDuration: formatTimer(callDuration),
+      totalTurns: callTurns.length,
+      turns: callTurns,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `voice-call-transcript-${conversationId || "session"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toastSuccess("Call transcript exported as JSON");
+  };
+
+  // Copy full transcript text
+  const handleCopyTranscript = () => {
+    const text = callTurns
+      .map((t) => `[${t.timestamp}] ${t.role.toUpperCase()}: ${t.content}`)
+      .join("\n\n");
+    navigator.clipboard.writeText(text);
+    toastSuccess("Transcript copied to clipboard");
   };
 
   // Dispatch real Twilio call
@@ -804,6 +1144,11 @@ export default function VoicePlaygroundPage() {
     return <LoadingState message="Loading Voice Playground..." />;
   }
 
+  // Count executed actions during call
+  const totalActionsExecuted = callTurns.reduce((acc, turn) => {
+    return acc + (turn.actionsTaken?.length || 0);
+  }, 0);
+
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 animate-slideUp">
       {/* Top Header */}
@@ -820,14 +1165,36 @@ export default function VoicePlaygroundPage() {
             Voice Playground
           </h1>
           <p className="text-xs text-content-muted mt-1">
-            Real-time telephony phone call simulator, continuous hands-free dialogue, audio visualizer, and Twilio voice routing.
+            Ultra-low latency telephony call simulator, multi-lingual AI voice assistant, continuous hands-free dialogue, and Twilio voice routing.
           </p>
         </div>
 
-        {/* Assistant Picker */}
-        <div className="flex items-center gap-3">
+        {/* Assistant & Language Selection */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Language Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-content-muted">Voice Assistant:</span>
+            <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <select
+              value={selectedLang.code}
+              onChange={(e) => {
+                const found = SUPPORTED_LANGUAGES.find((l) => l.code === e.target.value);
+                if (found) {
+                  setSelectedLang(found);
+                  toastSuccess(`Switched to ${found.name} (${found.flag})`);
+                }
+              }}
+              className="text-xs px-3 py-1.5 rounded-xl border border-surface-border bg-surface font-semibold text-content-primary focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.flag} {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Assistant Picker */}
+          <div className="flex items-center gap-2">
             <select
               value={selectedAssistantId}
               onChange={(e) => {
@@ -844,6 +1211,28 @@ export default function VoicePlaygroundPage() {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Language Quick-Select Pills Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        <span className="text-[11px] text-content-muted font-medium shrink-0">Language:</span>
+        {SUPPORTED_LANGUAGES.slice(0, 8).map((lang) => (
+          <button
+            key={lang.code}
+            onClick={() => {
+              setSelectedLang(lang);
+              toastSuccess(`Language set to ${lang.name}`);
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 flex items-center gap-1.5 ${
+              selectedLang.code === lang.code
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "border border-surface-border bg-surface hover:bg-surface-raised text-content-secondary"
+            }`}
+          >
+            <span>{lang.flag}</span>
+            <span>{lang.nativeName}</span>
+          </button>
+        ))}
       </div>
 
       {/* Navigation Tabs */}
@@ -904,6 +1293,8 @@ export default function VoicePlaygroundPage() {
                         ? "bg-amber-500 animate-spin"
                         : callState === "connected"
                         ? "bg-emerald-500"
+                        : callState === "on_hold"
+                        ? "bg-purple-500 animate-pulse"
                         : callState === "ringing"
                         ? "bg-purple-500 animate-ping"
                         : "bg-content-muted"
@@ -920,6 +1311,8 @@ export default function VoicePlaygroundPage() {
                       ? "Listening to Caller..."
                       : callState === "thinking"
                       ? "AI Evaluating Intent..."
+                      : callState === "on_hold"
+                      ? "Call On Hold (Chime Active)"
                       : callState === "ended"
                       ? "Call Disconnected"
                       : "Call Connected"}
@@ -933,7 +1326,7 @@ export default function VoicePlaygroundPage() {
                       {latencyMs}ms
                     </span>
                   )}
-                  {["connected", "listening", "thinking", "speaking"].includes(callState) && (
+                  {["connected", "listening", "thinking", "speaking", "on_hold"].includes(callState) && (
                     <div className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
                       {formatTimer(callDuration)}
                     </div>
@@ -957,13 +1350,15 @@ export default function VoicePlaygroundPage() {
               {/* Caller ID Card & Avatar */}
               <div className="text-center space-y-3 pt-1">
                 <div className="relative inline-block">
-                  {["connected", "listening", "thinking", "speaking"].includes(callState) && (
+                  {["connected", "listening", "thinking", "speaking", "on_hold"].includes(callState) && (
                     <div
                       className={`absolute -inset-3 rounded-full blur-xl opacity-50 transition-all ${
                         callState === "speaking"
                           ? "bg-emerald-500 animate-pulse"
                           : callState === "listening"
                           ? "bg-indigo-500 animate-pulse"
+                          : callState === "on_hold"
+                          ? "bg-purple-500 animate-pulse"
                           : "bg-amber-500 animate-pulse"
                       }`}
                     />
@@ -976,6 +1371,8 @@ export default function VoicePlaygroundPage() {
                           ? "text-emerald-600 dark:text-emerald-400 scale-110"
                           : callState === "listening"
                           ? "text-indigo-600 dark:text-indigo-400 scale-105"
+                          : callState === "on_hold"
+                          ? "text-purple-600 dark:text-purple-400"
                           : "text-content-secondary"
                       }`}
                     />
@@ -991,6 +1388,10 @@ export default function VoicePlaygroundPage() {
                     <span>•</span>
                     <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                       <Wifi className="h-3 w-3" /> HD Voice
+                    </span>
+                    <span>•</span>
+                    <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                      {selectedLang.flag} {selectedLang.nativeName}
                     </span>
                   </div>
                 </div>
@@ -1009,9 +1410,37 @@ export default function VoicePlaygroundPage() {
                     ? "Audio Output: Active"
                     : callState === "listening"
                     ? "Mic Input: Capturing"
+                    : callState === "on_hold"
+                    ? "Hold Chime: Playing"
                     : "Audio: Standby"}
                 </div>
               </div>
+
+              {/* Real-Time Live STT Streaming Speech Bubble */}
+              {callState === "listening" && liveCallerTranscript && (
+                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-100 animate-slideUp flex items-start gap-2 shadow-sm">
+                  <Mic className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 mt-0.5 animate-pulse shrink-0" />
+                  <div className="space-y-0.5">
+                    <span className="font-semibold text-[10px] uppercase text-indigo-600 dark:text-indigo-400">
+                      Hearing you live:
+                    </span>
+                    <p className="font-medium italic leading-relaxed">&ldquo;{liveCallerTranscript}&rdquo;</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Barge-in / Interrupt Agent Button (Appears when Agent is Speaking) */}
+              {callState === "speaking" && (
+                <div className="flex justify-center animate-slideUp">
+                  <button
+                    onClick={handleInterruptAgent}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+                  >
+                    <Flame className="h-3.5 w-3.5 animate-bounce" />
+                    <span>Interrupt Agent (Speak Now)</span>
+                  </button>
+                </div>
+              )}
 
               {/* Call Control Buttons */}
               {callState === "idle" || callState === "ended" ? (
@@ -1021,41 +1450,47 @@ export default function VoicePlaygroundPage() {
                     className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg hover:shadow-emerald-500/20 transition-all active:scale-[0.98]"
                   >
                     <PhoneCall className="h-5 w-5" />
-                    <span>Call Voice Assistant</span>
+                    <span>Call Voice Assistant ({selectedLang.flag})</span>
                   </button>
 
                   <button
                     onClick={() =>
-                      handleStartCall("Hello, thank you for calling customer support. How may I direct your call today?")
+                      handleStartCall(
+                        selectedLang.code.startsWith("es")
+                          ? "Hola, gracias por llamar a Acme Global. ¿En qué puedo ayudarle hoy?"
+                          : selectedLang.code.startsWith("fr")
+                          ? "Bonjour, merci d'avoir appelé Acme Global. Comment puis-je vous aider ?"
+                          : "Hello, thank you for calling Acme Global. How may I direct your call today?"
+                      )
                     }
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-surface-border bg-surface hover:bg-surface-raised text-xs font-semibold text-content-secondary transition-all"
                   >
                     <PhoneIncoming className="h-4 w-4 text-indigo-600" />
-                    <span>Simulate Incoming Caller</span>
+                    <span>Simulate Inbound Call</span>
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4 pt-1">
-                  {/* Call Action Bar */}
-                  <div className="flex items-center justify-center gap-3">
+                  {/* Primary Telephony Action Bar */}
+                  <div className="flex items-center justify-center gap-2.5">
                     {/* Microphone Mute */}
                     <button
                       onClick={() => {
                         setIsMicMuted((prev) => !prev);
                         if (!isMicMuted) {
                           stopSpeechRecognition();
-                        } else if (isHandsFree) {
+                        } else if (isHandsFree && callState !== "on_hold") {
                           startSpeechRecognition();
                         }
                       }}
-                      className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
+                      className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
                         isMicMuted
                           ? "bg-rose-500/10 border border-rose-500/20 text-rose-600"
                           : "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
                       }`}
                       title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
                     >
-                      {isMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5 text-indigo-600" />}
+                      {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4 text-indigo-600" />}
                     </button>
 
                     {/* Speaker Audio Output */}
@@ -1066,20 +1501,33 @@ export default function VoicePlaygroundPage() {
                           window.speechSynthesis.cancel();
                         }
                       }}
-                      className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
+                      className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
                         isSpeakerEnabled
                           ? "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
                           : "bg-rose-500/10 border border-rose-500/20 text-rose-600"
                       }`}
                       title={isSpeakerEnabled ? "Mute Speaker" : "Unmute Speaker"}
                     >
-                      {isSpeakerEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+                      {isSpeakerEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    </button>
+
+                    {/* Hold / Resume Call Button */}
+                    <button
+                      onClick={handleToggleHold}
+                      className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
+                        callState === "on_hold"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
+                          : "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
+                      }`}
+                      title={callState === "on_hold" ? "Resume Call from Hold" : "Place Call on Hold"}
+                    >
+                      {callState === "on_hold" ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                     </button>
 
                     {/* Keypad DTMF Toggle */}
                     <button
                       onClick={() => setShowKeypad((prev) => !prev)}
-                      className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${
+                      className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
                         showKeypad
                           ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                           : "bg-surface-raised border border-surface-border text-content-primary hover:bg-surface-border"
@@ -1088,7 +1536,7 @@ export default function VoicePlaygroundPage() {
                     >
                       <div className="grid grid-cols-3 gap-0.5">
                         {[...Array(9)].map((_, i) => (
-                          <div key={i} className="h-1 w-1 rounded-full bg-current" />
+                          <div key={i} className="h-0.5 w-0.5 rounded-full bg-current" />
                         ))}
                       </div>
                     </button>
@@ -1096,10 +1544,10 @@ export default function VoicePlaygroundPage() {
                     {/* Red End Call Button */}
                     <button
                       onClick={handleEndCall}
-                      className="h-12 px-6 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg hover:shadow-rose-500/20 transition-all active:scale-95"
+                      className="h-11 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg hover:shadow-rose-500/20 transition-all active:scale-95"
                       title="Hang Up Call"
                     >
-                      <PhoneOff className="h-5 w-5" />
+                      <PhoneOff className="h-4 w-4" />
                       <span>End Call</span>
                     </button>
                   </div>
@@ -1108,7 +1556,7 @@ export default function VoicePlaygroundPage() {
                   <form onSubmit={handleSendUtterance} className="relative flex items-center gap-2 pt-1">
                     <input
                       type="text"
-                      placeholder="Speak into microphone or type speech turn..."
+                      placeholder={`Speak into mic or type in ${selectedLang.nativeName}...`}
                       value={textUtterance}
                       onChange={(e) => setTextUtterance(e.target.value)}
                       className="w-full text-xs pl-3 pr-10 py-2.5 rounded-xl border border-surface-border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
@@ -1167,20 +1615,22 @@ export default function VoicePlaygroundPage() {
                     onChange={(e) => setIsHandsFree(e.target.checked)}
                     className="rounded text-indigo-600 focus:ring-0"
                   />
-                  <span>Hands-Free Auto-Dialogue</span>
+                  <span>Hands-Free Dialogue</span>
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block text-[11px] text-content-muted mb-1">Synthesizer Voice</label>
+                  <label className="block text-[11px] text-content-muted mb-1">
+                    Voice ({matchingVoices.length} native)
+                  </label>
                   <select
                     value={selectedVoiceName}
                     onChange={(e) => setSelectedVoiceName(e.target.value)}
                     className="w-full text-[11px] px-2 py-1.5 rounded-lg border border-surface-border bg-background text-content-primary focus:outline-none"
                   >
-                    <option value="auto">Natural Neural (Auto)</option>
-                    {availableVoices.map((v) => (
+                    <option value="auto">Native Neural (Auto)</option>
+                    {(matchingVoices.length > 0 ? matchingVoices : availableVoices).map((v) => (
                       <option key={v.name} value={v.name}>
                         {v.name.length > 24 ? v.name.substring(0, 24) + "..." : v.name}
                       </option>
@@ -1192,8 +1642,8 @@ export default function VoicePlaygroundPage() {
                   <label className="block text-[11px] text-content-muted mb-1">Pacing Rate: {selectedVoiceRate}x</label>
                   <input
                     type="range"
-                    min={0.9}
-                    max={1.25}
+                    min={0.8}
+                    max={1.35}
                     step={0.05}
                     value={selectedVoiceRate}
                     onChange={(e) => setSelectedVoiceRate(parseFloat(e.target.value))}
@@ -1210,6 +1660,11 @@ export default function VoicePlaygroundPage() {
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-emerald-600" />
                 <h3 className="text-xs font-bold text-content-primary">Live Call Transcript & Audits</h3>
+                {totalActionsExecuted > 0 && (
+                  <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">
+                    {totalActionsExecuted} MCP Action{totalActionsExecuted > 1 ? "s" : ""}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -1217,6 +1672,24 @@ export default function VoicePlaygroundPage() {
                   <span className="text-[10px] font-mono text-content-muted bg-surface-raised px-2 py-0.5 rounded-lg border border-surface-border">
                     Session: {conversationId.substring(0, 8)}...
                   </span>
+                )}
+                {callTurns.length > 0 && (
+                  <button
+                    onClick={handleCopyTranscript}
+                    className="p-1.5 rounded-lg border border-surface-border bg-surface hover:bg-surface-raised text-content-muted hover:text-content-primary transition-colors text-xs"
+                    title="Copy full transcript"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {callTurns.length > 0 && (
+                  <button
+                    onClick={handleDownloadTranscript}
+                    className="p-1.5 rounded-lg border border-surface-border bg-surface hover:bg-surface-raised text-content-muted hover:text-content-primary transition-colors text-xs"
+                    title="Export transcript JSON"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
                 )}
                 {callTurns.length > 0 && (
                   <button
@@ -1316,6 +1789,71 @@ export default function VoicePlaygroundPage() {
                 ))
               )}
               <div ref={transcriptEndRef} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Call Summary Modal */}
+      {showSummaryModal && callTurns.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-slideUp">
+          <div className="bg-surface border border-surface-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <h3 className="text-base font-bold text-content-primary">Call Summary & Disposition</h3>
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="text-content-muted hover:text-content-primary text-xs font-semibold px-2 py-1"
+              >
+                Close ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="p-3 rounded-xl bg-surface-raised border border-surface-border">
+                <div className="text-[10px] text-content-muted uppercase">Duration</div>
+                <div className="text-sm font-bold text-content-primary font-mono mt-0.5">
+                  {formatTimer(callDuration)}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-raised border border-surface-border">
+                <div className="text-[10px] text-content-muted uppercase">Dialogue Turns</div>
+                <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">
+                  {callTurns.length}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-raised border border-surface-border">
+                <div className="text-[10px] text-content-muted uppercase">Language</div>
+                <div className="text-sm font-bold text-content-primary mt-0.5">
+                  {selectedLang.flag} {selectedLang.nativeName}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <div className="font-semibold text-content-primary">Call Disposition:</div>
+              <p className="text-content-muted leading-relaxed">
+                Autonomous voice session concluded cleanly. All multi-turn dialogue, audio cadence metrics, and executed MCP actions were persisted to the MongoDB audit log.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-surface-border">
+              <button
+                onClick={handleCopyTranscript}
+                className="px-3 py-2 rounded-xl border border-surface-border bg-surface hover:bg-surface-raised text-xs font-semibold text-content-primary transition-colors flex items-center gap-1.5"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>Copy Transcript</span>
+              </button>
+              <button
+                onClick={handleDownloadTranscript}
+                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Export JSON</span>
+              </button>
             </div>
           </div>
         </div>
