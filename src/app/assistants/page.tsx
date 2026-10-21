@@ -64,7 +64,7 @@ export default function AssistantsPage() {
   const [channels, setChannels] = useState<string[]>(["chat"]);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [knowledgeBase, setKnowledgeBase] = useState("");
-  const [enabledActions, setEnabledActions] = useState<string[]>(["book_appointment"]);
+  const [enabledActions, setEnabledActions] = useState<string[]>([]);
 
   const loadAssistants = useCallback(async () => {
     if (!currentOrg) return;
@@ -89,9 +89,9 @@ export default function AssistantsPage() {
     setName("");
     setUseCase("appointment_booking");
     setChannels(["chat", "voice"]);
-    setSystemPrompt("You are an autonomous AI assistant for our business. Help customers schedule appointments and answer inquiries.");
-    setKnowledgeBase("company-faq");
-    setEnabledActions(["book_appointment", "send_email", "transfer_call"]);
+    setSystemPrompt("");
+    setKnowledgeBase("");
+    setEnabledActions([]);
     setIsModalOpen(true);
   };
 
