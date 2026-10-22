@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function ConversationsPage() {
   const { currentOrg } = useAuth();
@@ -170,13 +172,11 @@ export default function ConversationsPage() {
       {isLoading ? (
         <LoadingState message="Loading conversations..." />
       ) : filteredConversations.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-surface-border bg-surface text-center">
-          <History className="h-10 w-10 text-content-muted mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-content-primary mb-1">No conversations found</h3>
-          <p className="text-xs text-content-muted mb-4 max-w-sm mx-auto">
-            Interact with your assistant via chat or initiate a phone call to start recording session logs.
-          </p>
-        </div>
+        <EmptyState
+          icon={History}
+          title="No conversations found"
+          description="Interact with your assistant via chat or initiate a phone call to start recording session logs."
+        />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-surface-border bg-surface shadow-sm">
           <table className="w-full text-left text-xs text-content-secondary">
@@ -222,15 +222,7 @@ export default function ConversationsPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
-                        c.status === "active"
-                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                          : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      }`}
-                    >
-                      {c.status}
-                    </span>
+                    <StatusBadge status={c.status} />
                   </td>
                   <td className="py-3 px-4 text-[11px] text-content-muted">
                     {new Date(c.startedAt).toLocaleString([], {

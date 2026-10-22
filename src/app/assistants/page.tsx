@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const USE_CASE_OPTIONS = [
   { value: "appointment_booking", label: "Appointment Booking", desc: "Schedule appointments, dental checkups, calendar slots" },
@@ -245,20 +247,15 @@ export default function AssistantsPage() {
       {isLoading ? (
         <LoadingState message="Loading assistants..." />
       ) : filteredAssistants.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-surface-border bg-surface text-center">
-          <Bot className="h-10 w-10 text-content-muted mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-content-primary mb-1">No assistants found</h3>
-          <p className="text-xs text-content-muted mb-4 max-w-sm mx-auto">
-            Get started by provisioning an assistant for customer support, appointment booking, or proactive outreach.
-          </p>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Create Assistant</span>
-          </button>
-        </div>
+        <EmptyState
+          icon={Bot}
+          title="No assistants found"
+          description="Get started by provisioning an assistant for customer support, appointment booking, or proactive outreach."
+          action={{
+            label: "Create Assistant",
+            onClick: openCreateModal,
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredAssistants.map((a) => (
@@ -279,15 +276,7 @@ export default function AssistantsPage() {
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase ${
-                      a.status === "active"
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                        : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20"
-                    }`}
-                  >
-                    {a.status}
-                  </span>
+                  <StatusBadge status={a.status} />
                 </div>
 
                 <p className="text-xs text-content-secondary line-clamp-3 mb-4 leading-relaxed">
