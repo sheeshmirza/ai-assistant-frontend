@@ -19,6 +19,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PaginationControl } from "@/components/ui/PaginationControl";
 
 export default function ConversationsPage() {
   const { currentOrg } = useAuth();
@@ -30,9 +31,11 @@ export default function ConversationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Filters
+  // Filters & Pagination
   const [filterChannel, setFilterChannel] = useState<string>("all");
   const [filterDirection, setFilterDirection] = useState<string>("all");
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 10;
 
   const loadAssistants = useCallback(async () => {
     if (!currentOrg) return;
@@ -88,6 +91,11 @@ export default function ConversationsPage() {
     return matchChannel && matchDirection;
   });
 
+  const paginatedConversations = filteredConversations.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 animate-slideUp">
       {/* Top Header */}
@@ -138,7 +146,10 @@ export default function ConversationsPage() {
           {["all", "chat", "voice"].map((ch) => (
             <button
               key={ch}
-              onClick={() => setFilterChannel(ch)}
+              onClick={() => {
+                setFilterChannel(ch);
+                setPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                 filterChannel === ch
                   ? "bg-surface-raised text-content-primary border border-surface-border shadow-sm font-semibold"
@@ -154,7 +165,10 @@ export default function ConversationsPage() {
           {["all", "inbound", "outbound"].map((dir) => (
             <button
               key={dir}
-              onClick={() => setFilterDirection(dir)}
+              onClick={() => {
+                setFilterDirection(dir);
+                setPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                 filterDirection === dir
                   ? "bg-surface-raised text-content-primary border border-surface-border shadow-sm font-semibold"
