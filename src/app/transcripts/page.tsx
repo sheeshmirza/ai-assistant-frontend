@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function TranscriptsPage() {
   const { currentOrg } = useAuth();
@@ -147,13 +148,11 @@ export default function TranscriptsPage() {
       {isLoading ? (
         <LoadingState message="Loading transcripts from MongoDB..." />
       ) : transcripts.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-surface-border bg-surface text-center">
-          <FileText className="h-10 w-10 text-content-muted mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-content-primary mb-1">No transcripts found</h3>
-          <p className="text-xs text-content-muted max-w-sm mx-auto">
-            No dialogue entries recorded in MongoDB for this assistant yet. Start a chat or voice conversation.
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No transcripts found"
+          description="No dialogue entries recorded in MongoDB for this assistant yet. Start a chat or voice conversation."
+        />
       ) : (
         <div className="space-y-4">
           {transcripts.map((entry) => {

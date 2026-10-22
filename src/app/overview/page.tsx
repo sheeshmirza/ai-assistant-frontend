@@ -20,6 +20,8 @@ import {
 import CodeSnippet from "@/components/ui/CodeSnippet";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function OverviewPage() {
   const { currentOrg } = useAuth();
@@ -191,20 +193,15 @@ export default function OverviewPage() {
           </div>
 
           {assistants.length === 0 ? (
-            <div className="p-8 rounded-2xl border border-surface-border bg-surface text-center">
-              <Bot className="h-8 w-8 text-content-muted mx-auto mb-2" />
-              <p className="text-xs font-semibold text-content-primary mb-1">No assistants created yet</p>
-              <p className="text-[11px] text-content-muted mb-4 max-w-sm mx-auto">
-                Create your first assistant to handle inbound queries, schedule appointments, or make outbound calls.
-              </p>
-              <Link
-                href="/assistants"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-sm transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Create Assistant</span>
-              </Link>
-            </div>
+            <EmptyState
+              icon={Bot}
+              title="No assistants created yet"
+              description="Create your first assistant to handle inbound queries, schedule appointments, or make outbound calls."
+              action={{
+                label: "Create Assistant",
+                href: "/assistants",
+              }}
+            />
           ) : (
             <div className="space-y-3">
               {assistants.slice(0, 5).map((a) => (
@@ -227,15 +224,7 @@ export default function OverviewPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-medium uppercase ${
-                        a.status === "active"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                          : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20"
-                      }`}
-                    >
-                      {a.status}
-                    </span>
+                    <StatusBadge status={a.status} />
                     <Link
                       href={`/chat?assistantId=${a.id}`}
                       className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-raised transition-colors"
