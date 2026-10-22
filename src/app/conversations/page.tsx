@@ -205,7 +205,7 @@ export default function ConversationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-border">
-              {filteredConversations.map((c) => (
+              {paginatedConversations.map((c) => (
                 <tr key={c.id} className="hover:bg-surface-raised/40 transition-colors">
                   <td className="py-3 px-4 font-mono font-medium text-content-primary">
                     {c.id.substring(0, 18)}...
@@ -270,6 +270,13 @@ export default function ConversationsPage() {
               ))}
             </tbody>
           </table>
+
+          <PaginationControl
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={filteredConversations.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>
