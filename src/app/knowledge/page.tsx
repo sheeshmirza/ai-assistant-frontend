@@ -5,13 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { api, Assistant, VectorSearchResult } from "@/lib/api";
 import {
-  BookOpen,
   Search,
   UploadCloud,
   CheckCircle2,
-  Sparkles,
   Loader2,
-  FileText,
   Database,
   Layers,
   Copy,
@@ -35,7 +32,6 @@ export default function KnowledgeBasePage() {
   const [collections, setCollections] = useState<string[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [collectionName, setCollectionName] = useState("");
-  const [isLoadingMeta, setIsLoadingMeta] = useState(false);
 
   // Ingestion State
   const [documentTitle, setDocumentTitle] = useState("");
@@ -53,7 +49,6 @@ export default function KnowledgeBasePage() {
   // Load existing collections and assistants
   const loadMetadata = useCallback(async () => {
     if (!currentOrg) return;
-    setIsLoadingMeta(true);
     try {
       const [colsData, asstsData] = await Promise.all([
         api.listKnowledgeCollections(currentOrg.id).catch(() => ({ collections: [] })),
@@ -73,8 +68,6 @@ export default function KnowledgeBasePage() {
       }
     } catch {
       // Graceful fallback
-    } finally {
-      setIsLoadingMeta(false);
     }
   }, [currentOrg]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { api, User, Organization, APIError } from "./api";
+import { api, User, Organization } from "./api";
 
 const TOKEN_KEY = "ai_assistant_token";
 const ORG_KEY = "ai_assistant_org_id";

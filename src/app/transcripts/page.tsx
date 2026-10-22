@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { useToast } from "@/lib/toast-context";
 import { api, Assistant, TranscriptEntry } from "@/lib/api";
 import {
   FileText,
@@ -12,15 +11,12 @@ import {
   Wrench,
   RefreshCw,
   Search,
-  History,
-  Sparkles,
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 
 export default function TranscriptsPage() {
   const { currentOrg } = useAuth();
-  const { error: toastError } = useToast();
   const searchParams = useSearchParams();
 
   const [assistants, setAssistants] = useState<Assistant[]>([]);

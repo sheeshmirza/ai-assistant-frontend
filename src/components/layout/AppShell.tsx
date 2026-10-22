@@ -46,7 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
       <OfflineBanner />
-      <Navbar isLanding={isLanding} isLogin={isLogin} />
+      <Navbar isLogin={isLogin} />
       <div className="flex flex-1">
         {!isPublic && <Sidebar />}
         <main

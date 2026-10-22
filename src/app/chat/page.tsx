@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { api, Assistant, ChatResponseData, ActionTaken } from "@/lib/api";
+import { api, Assistant, ActionTaken } from "@/lib/api";
 import {
   Bot,
   Send,
@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Wrench,
   Loader2,
-  Trash2,
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 

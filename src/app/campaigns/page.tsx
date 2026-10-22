@@ -8,11 +8,9 @@ import {
   Send,
   Mail,
   MessageSquare,
-  Bot,
   Sparkles,
   CheckCircle2,
   Loader2,
-  Wrench,
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 

@@ -5,14 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { Organization } from "@/lib/api";
 import {
-  Building,
   Plus,
   CheckCircle2,
-  Users,
-  Shield,
   ArrowRight,
   Loader2,
-  Calendar,
   Trash2,
   AlertTriangle,
 } from "lucide-react";

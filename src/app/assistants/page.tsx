@@ -14,10 +14,7 @@ import {
   Trash2,
   X,
   Search,
-  Check,
-  Sparkles,
   BookOpen,
-  Wrench,
   Loader2,
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";

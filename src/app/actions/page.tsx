@@ -6,7 +6,6 @@ import { useToast } from "@/lib/toast-context";
 import { api } from "@/lib/api";
 import {
   Wrench,
-  CheckCircle2,
   Calendar,
   Mail,
   MessageSquare,

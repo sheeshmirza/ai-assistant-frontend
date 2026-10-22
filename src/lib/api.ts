@@ -74,20 +74,6 @@ export interface ConversationMessage {
   timestamp: string;
 }
 
-export interface ConversationLog {
-  id: string;
-  organizationId: string;
-  assistantId: string;
-  conversationId: string;
-  channel: string;
-  messages: ConversationMessage[];
-  metadata?: {
-    actions_taken?: ActionTaken[];
-    [key: string]: any;
-  };
-  createdAt: string;
-}
-
 export interface TranscriptEntry {
   id: string;
   organizationId: string;
@@ -135,12 +121,6 @@ export interface OutboundCallResponseData {
   callSid: string;
   conversationId: string;
   status: string;
-}
-
-export interface MCPActionDefinition {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>;
 }
 
 export interface VectorSearchResult {

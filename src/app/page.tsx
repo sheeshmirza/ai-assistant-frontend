@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Bot,
   MessageSquare,
   PhoneCall,
   Wrench,
   ArrowRight,
   ShieldCheck,
-  Zap,
   Sparkles,
 } from "lucide-react";
 

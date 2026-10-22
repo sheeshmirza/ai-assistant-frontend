@@ -11,12 +11,9 @@ import {
   PhoneCall,
   ArrowDownLeft,
   ArrowUpRight,
-  CheckCircle2,
-  XCircle,
   FileText,
   StopCircle,
   RefreshCw,
-  Search,
 } from "lucide-react";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";

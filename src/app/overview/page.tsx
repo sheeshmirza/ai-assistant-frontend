@@ -9,14 +9,12 @@ import {
   MessageSquare,
   PhoneCall,
   Wrench,
-  Sparkles,
   ArrowRight,
   RefreshCw,
   Plus,
   Send,
   Activity,
   CheckCircle2,
-  AlertTriangle,
   History,
 } from "lucide-react";
 import CodeSnippet from "@/components/ui/CodeSnippet";

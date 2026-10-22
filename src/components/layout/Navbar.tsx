@@ -14,22 +14,13 @@ import {
   Sun,
   Moon,
   Plus,
-  Radio,
   Menu,
   X,
-  Sparkles,
-  PhoneCall,
-  MessageSquare,
-  Wrench,
-  BookOpen,
-  Settings as SettingsIcon,
 } from "lucide-react";
 
 export default function Navbar({
-  isLanding = false,
   isLogin = false,
 }: {
-  isLanding?: boolean;
   isLogin?: boolean;
 }) {
   const pathname = usePathname();

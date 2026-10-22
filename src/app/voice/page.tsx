@@ -16,7 +16,6 @@ import {
   Volume2,
   VolumeX,
   Radio,
-  Sparkles,
   Bot,
   User as UserIcon,
   CheckCircle2,
@@ -27,12 +26,9 @@ import {
   Send,
   RotateCcw,
   Activity,
-  Calendar,
-  ShieldCheck,
   Play,
   Volume1,
   Sliders,
-  Settings,
   Wifi,
   Zap,
   Globe,
@@ -40,7 +36,6 @@ import {
   Flame,
   Download,
 } from "lucide-react";
-import CodeSnippet from "@/components/ui/CodeSnippet";
 import { LoadingState } from "@/components/ui/LoadingState";
 
 interface VoiceLanguage {
